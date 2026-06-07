@@ -134,6 +134,23 @@
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
     }
+
+    /* Custom Animations */
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    .animate-fadeIn {
+      animation: fadeIn 0.3s ease-out forwards;
+    }
+
+    @keyframes scaleUp {
+      from { transform: scale(0.95); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+    .animate-scaleUp {
+      animation: scaleUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
   </style>
 </head>
 <body class="text-neutral-700">
@@ -163,6 +180,7 @@
       const [selectedCategory, setSelectedCategory] = useState('Semua');
       const [sortBy, setSortBy] = useState('terkait');
       const [selectedProduct, setSelectedProduct] = useState(null);
+      const [isImageZoomed, setIsImageZoomed] = useState(false); // State memperbesar gambar produk
       
       // State autentikasi admin panel
       const [showAdminPanel, setShowAdminPanel] = useState(false);
@@ -180,7 +198,8 @@
       const [newAdminUser, setNewAdminUser] = useState('');
       const [newAdminPass, setNewAdminPass] = useState('');
 
-      // State data input form produk baru
+      // State data input form produk baru & edit produk
+      const [editingProduct, setEditingProduct] = useState(null); // State produk yang sedang diedit
       const [newTitle, setNewTitle] = useState('');
       const [newPrice, setNewPrice] = useState('');
       const [newCategory, setNewCategory] = useState('');
@@ -279,7 +298,7 @@
         if (typeof lucide !== 'undefined') {
           lucide.createIcons();
         }
-      }, [showAdminPanel, showPasswordModal, selectedProduct, products, categories, loginError, adminNotification, showPasswordText, confirmModal, isLoading, apiConnected, apiError]);
+      }, [showAdminPanel, showPasswordModal, selectedProduct, products, categories, loginError, adminNotification, showPasswordText, confirmModal, isLoading, apiConnected, apiError, editingProduct, isImageZoomed]);
 
       // ==========================================
       // LOGIKA FILTER & SORTING
@@ -294,7 +313,7 @@
         if (sortBy === 'terlaris') return b.sold - a.sold;
         if (sortBy === 'termurah') return a.price - b.price;
         if (sortBy === 'termahal') return b.price - a.price;
-        return b.rating - a.rating; // Terkait / Rating tertinggi
+        return b.sold - a.sold; // Default terpopuler jika tidak disortir
       });
 
       // ==========================================
@@ -363,6 +382,8 @@
       const handleLogoutAdmin = () => {
         setIsAdminAuthenticated(false);
         setShowAdminPanel(false);
+        setEditingProduct(null);
+        resetProductForm();
         showAdminToast("🔒 Anda telah keluar dari mode admin.");
       };
 
@@ -400,6 +421,32 @@
       // ==========================================
       // MANAJEMEN PRODUK SPREADSHEET
       // ==========================================
+      const resetProductForm = () => {
+        setEditingProduct(null);
+        setNewTitle('');
+        setNewPrice('');
+        setNewImage('');
+        setNewDesc('');
+        if (categories.length > 0) {
+          setNewCategory(categories[0]);
+        }
+      };
+
+      const handleEditClick = (product) => {
+        setEditingProduct(product);
+        setNewTitle(product.title);
+        setNewPrice(product.price.toString());
+        setNewCategory(product.category);
+        setNewImage(product.image);
+        setNewDesc(product.description);
+        
+        // Scroll ke formulir input
+        const formElement = document.getElementById("product-form-card");
+        if (formElement) {
+          formElement.scrollIntoView({ behavior: 'smooth' });
+        }
+      };
+
       const handleAddProduct = async (e) => {
         e.preventDefault();
         if (!newTitle || !newPrice) {
@@ -415,34 +462,56 @@
 
         const finalImage = newImage.trim() !== "" ? newImage : "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=500";
 
-        const newProduct = {
-          id: Date.now(),
-          title: newTitle,
-          price: priceNum,
-          category: newCategory || categories[0],
-          image: finalImage,
-          rating: 5.0,
-          sold: 0,
-          description: newDesc || "Tidak ada deskripsi tambahan untuk kerajinan tangan imut ini."
-        };
+        if (editingProduct) {
+          // Melakukan Update/Edit data produk
+          const updatedProduct = {
+            id: editingProduct.id,
+            title: newTitle,
+            price: priceNum,
+            category: newCategory || categories[0],
+            image: finalImage,
+            description: newDesc || "Tidak ada deskripsi tambahan untuk kerajinan tangan imut ini."
+          };
 
-        const payload = {
-          action: "add_product",
-          product: newProduct
-        };
+          const payload = {
+            action: "edit_product",
+            product: updatedProduct
+          };
 
-        const result = await sendPostRequest(payload);
-        if (result.status === "success") {
-          showAdminToast("✨ Produk baru sukses disimpan di Google Sheets!");
-          // Reset Inputs
-          setNewTitle('');
-          setNewPrice('');
-          setNewImage('');
-          setNewDesc('');
-          // Refresh database lokal
-          await loadDatabase();
+          const result = await sendPostRequest(payload);
+          if (result.status === "success") {
+            showAdminToast("✨ Perubahan katalog sukses disimpan di Google Sheets!");
+            resetProductForm();
+            await loadDatabase();
+          } else {
+            showAdminToast(`❌ Gagal memperbarui: ${result.message}`);
+          }
         } else {
-          showAdminToast(`❌ Gagal menyimpan: ${result.message}`);
+          // Melakukan Tambah produk baru
+          const newProduct = {
+            id: Date.now(),
+            title: newTitle,
+            price: priceNum,
+            category: newCategory || categories[0],
+            image: finalImage,
+            rating: 5.0,
+            sold: 0,
+            description: newDesc || "Tidak ada deskripsi tambahan untuk kerajinan tangan imut ini."
+          };
+
+          const payload = {
+            action: "add_product",
+            product: newProduct
+          };
+
+          const result = await sendPostRequest(payload);
+          if (result.status === "success") {
+            showAdminToast("✨ Produk baru sukses disimpan di Google Sheets!");
+            resetProductForm();
+            await loadDatabase();
+          } else {
+            showAdminToast(`❌ Gagal menyimpan: ${result.message}`);
+          }
         }
       };
 
@@ -516,6 +585,39 @@
         });
       };
 
+      // ==========================================
+      // FUNGSI MEMBUKA PRODUK & AUTOMATIC VIEW INCREMENT
+      // ==========================================
+      const handleOpenProduct = (product) => {
+        setSelectedProduct(product);
+        setIsImageZoomed(false); // Reset status perbesar gambar
+
+        // 1. Secara instan tambahkan tayangan di layar lokal
+        setProducts(prevProducts => prevProducts.map(p => {
+          if (p.id === product.id) {
+            return { ...p, sold: (p.sold || 0) + 1 };
+          }
+          return p;
+        }));
+
+        setSelectedProduct(prev => prev ? { ...prev, sold: (prev.sold || 0) + 1 } : null);
+
+        // 2. Kirim update view count ke Google Sheets di latar belakang
+        if (apiConnected && diagnosis.valid) {
+          fetch(GAS_API_URL, {
+            method: "POST",
+            mode: "cors",
+            headers: {
+              "Content-Type": "text/plain;charset=utf-8",
+            },
+            body: JSON.stringify({
+              action: "increment_view",
+              productId: product.id
+            })
+          }).catch(err => console.warn("Background view increment failed:", err));
+        }
+      };
+
       const showAdminToast = (msg) => {
         setAdminNotification(msg);
         setTimeout(() => setAdminNotification(''), 4000);
@@ -577,7 +679,7 @@
               <div className="flex items-center gap-2">
                 {showAdminPanel && (
                   <button 
-                    onClick={() => setShowAdminPanel(false)}
+                    onClick={() => { setShowAdminPanel(false); resetProductForm(); }}
                     className="px-4 py-2 text-sm font-bold clay-btn-secondary flex items-center gap-2"
                   >
                     <i data-lucide="home" className="w-4 h-4"></i>
@@ -676,7 +778,7 @@
                       <li className="flex items-start gap-2">
                         <span className="text-pink-500 mt-0.5">✔</span>
                         <div>
-                          <strong>Setiap ada perubahan kode di GAS wajib redeploy:</strong> Jangan lupa klik <strong>Deploy &gt; Manage deployments &gt; Edit &gt; Version: New Version &gt; Deploy</strong> setiap kali Anda mengedit <code className="bg-neutral-100 px-1 py-0.5 rounded font-mono text-neutral-600">code.gs</code>.
+                          <strong>Setiap ada perubahan kode di GAS wajib redeploy:</strong> Jangan lupa klik <strong>Deploy &gt; Manage deployments &gt; Edit &gt; Version: New Version &gt; Deploy</strong> setiap kali Anda mengedit <code className="bg-neutral-100 px-1 py-0.5 rounded font-mono text-pink-600">code.gs</code>.
                         </div>
                       </li>
                     </ul>
@@ -734,10 +836,11 @@
                     {/* Kolom Kiri: Form Produk & Kelola Kategori */}
                     <div className="space-y-6 lg:col-span-1">
                       
-                      {/* Form Input Tambah Produk */}
-                      <div className="clay-card p-6 bg-white">
+                      {/* Form Input Tambah/Edit Produk */}
+                      <div className="clay-card p-6 bg-white" id="product-form-card">
                         <h3 className="text-lg font-bold text-neutral-800 mb-4 pb-2 border-b-2 border-pink-100 flex items-center gap-2">
-                          <i data-lucide="plus-circle" className="text-[#FF69B4] w-5 h-5"></i> Tambah Produk Baru
+                          <i data-lucide={editingProduct ? "pencil-line" : "plus-circle"} className="text-[#FF69B4] w-5 h-5"></i> 
+                          {editingProduct ? "Edit Produk Katalog" : "Tambah Produk Baru"}
                         </h3>
                         <form onSubmit={handleAddProduct} className="space-y-4">
                           
@@ -805,13 +908,24 @@
                             ></textarea>
                           </div>
 
-                          <button 
-                            type="submit" 
-                            className="w-full py-3 font-bold clay-btn disabled:opacity-50 disabled:cursor-not-allowed"
-                            disabled={categories.length === 0}
-                          >
-                            Simpan ke Spreadsheet ✨
-                          </button>
+                          <div className="flex gap-2">
+                            {editingProduct && (
+                              <button 
+                                type="button" 
+                                onClick={resetProductForm}
+                                className="w-1/3 py-3 font-bold clay-btn-secondary text-sm"
+                              >
+                                Batal
+                              </button>
+                            )}
+                            <button 
+                              type="submit" 
+                              className={`font-bold py-3 disabled:opacity-50 disabled:cursor-not-allowed ${editingProduct ? "w-2/3" : "w-full"} clay-btn`}
+                              disabled={categories.length === 0}
+                            >
+                              {editingProduct ? "Simpan Perubahan 💾" : "Simpan ke Spreadsheet ✨"}
+                            </button>
+                          </div>
 
                         </form>
                       </div>
@@ -900,13 +1014,23 @@
                                     {formatRupiah(product.price)}
                                   </td>
                                   <td className="py-3 px-3 text-center">
-                                    <button 
-                                      onClick={() => handleDeleteProduct(product.id)}
-                                      className="p-1.5 clay-btn-danger text-xs hover:scale-105 transition-transform"
-                                      title="Hapus Produk"
-                                    >
-                                      <i data-lucide="trash-2" className="w-4 h-4"></i>
-                                    </button>
+                                    <div className="flex gap-1 justify-center">
+                                      {/* FITUR 1: Toggle Edit Katalog */}
+                                      <button 
+                                        onClick={() => handleEditClick(product)}
+                                        className="p-1.5 clay-btn-secondary text-xs hover:scale-105 transition-transform"
+                                        title="Edit Produk"
+                                      >
+                                        <i data-lucide="pencil-line" className="w-4 h-4"></i>
+                                      </button>
+                                      <button 
+                                        onClick={() => handleDeleteProduct(product.id)}
+                                        className="p-1.5 clay-btn-danger text-xs hover:scale-105 transition-transform"
+                                        title="Hapus Produk"
+                                      >
+                                        <i data-lucide="trash-2" className="w-4 h-4"></i>
+                                      </button>
+                                    </div>
                                   </td>
                                 </tr>
                               ))}
@@ -1075,7 +1199,7 @@
                     <div 
                       key={product.id} 
                       className="clay-card flex flex-col justify-between overflow-hidden cursor-pointer"
-                      onClick={() => setSelectedProduct(product)}
+                      onClick={() => handleOpenProduct(product)}
                     >
                       {/* Image Frame */}
                       <div className="aspect-square w-full overflow-hidden relative bg-[#FFF0F5]">
@@ -1100,13 +1224,10 @@
                             {product.title}
                           </h4>
                           
-                          {/* Rating */}
+                          {/* FITUR 4 & 3: Rating dihapus, Tampilan tayangan bertambah otomatis */}
                           <div className="flex items-center gap-1.5 text-xs text-neutral-500">
-                            <span className="text-yellow-400 flex items-center font-bold">
-                              ★ <span className="text-neutral-700 ml-0.5">{product.rating}</span>
-                            </span>
-                            <span className="text-neutral-300">|</span>
-                            <span>{product.sold}+ dilihat</span>
+                            <i data-lucide="eye" className="w-3.5 h-3.5 text-[#FF69B4]"></i>
+                            <span>{product.sold || 0}+ dilihat</span>
                           </div>
                         </div>
 
@@ -1277,20 +1398,31 @@
                 {/* Tombol Tutup Silang Atas */}
                 <button 
                   onClick={() => setSelectedProduct(null)} 
-                  className="absolute top-4 right-4 p-2 rounded-full hover:bg-neutral-100 text-neutral-400 hover:text-neutral-600 transition-colors"
+                  className="absolute top-4 right-4 p-2 rounded-full hover:bg-neutral-100 text-neutral-400 hover:text-neutral-600 transition-colors bg-white/85"
                 >
                   <i data-lucide="x" className="w-5 h-5"></i>
                 </button>
 
                 {/* Konten Detail */}
                 <div className="space-y-4">
-                  {/* Foto Detail */}
-                  <div className="aspect-video w-full overflow-hidden rounded-2xl border-4 border-pink-100">
+                  {/* FITUR 2: Foto Detail bisa diklik untuk diperbesar secara utuh */}
+                  <div 
+                    className="aspect-video w-full overflow-hidden rounded-2xl border-4 border-pink-100 relative group cursor-zoom-in"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsImageZoomed(true);
+                    }}
+                  >
                     <img 
                       src={selectedProduct.image} 
                       alt={selectedProduct.title} 
-                      className="w-full h-full object-cover" 
+                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
                     />
+                    <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <span className="bg-white/95 text-pink-600 px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 shadow-md">
+                        <i data-lucide="zoom-in" className="w-4 h-4"></i> Perbesar Gambar
+                      </span>
+                    </div>
                   </div>
 
                   <div className="space-y-2">
@@ -1304,22 +1436,21 @@
                       {selectedProduct.title}
                     </h3>
 
-                    {/* Harga & Rating */}
+                    {/* Harga & FITUR 3 & 4: Tayangan bertambah instan, Rating dihapus */}
                     <div className="flex items-center justify-between py-2 border-y-2 border-pink-50">
                       <div className="text-2xl font-bold text-[#FF69B4] font-cute">
                         {formatRupiah(selectedProduct.price)}
                       </div>
-                      <div className="flex items-center gap-3 text-sm">
-                        <span className="text-yellow-400 font-bold flex items-center gap-0.5">★ {selectedProduct.rating}</span>
-                        <span className="text-neutral-300">|</span>
-                        <span className="text-neutral-500 font-medium">{selectedProduct.sold}+ dilihat</span>
+                      <div className="flex items-center gap-2 text-sm text-neutral-500 font-medium bg-pink-50/60 px-3 py-1 rounded-full border border-pink-100">
+                        <i data-lucide="eye" className="w-4 h-4 text-[#FF69B4]"></i>
+                        <span>{selectedProduct.sold || 0}+ dilihat</span>
                       </div>
                     </div>
 
                     {/* Deskripsi */}
                     <div className="space-y-1">
                       <span className="text-xs font-bold text-neutral-400 uppercase tracking-wider">Deskripsi Produk:</span>
-                      <p className="text-sm text-neutral-600 leading-relaxed max-h-36 overflow-y-auto pr-1">
+                      <p className="text-sm text-neutral-600 leading-relaxed max-h-32 overflow-y-auto pr-1">
                         {selectedProduct.description}
                       </p>
                     </div>
@@ -1346,7 +1477,7 @@
                           rel="noopener noreferrer"
                           className="flex-1 py-3 font-bold clay-btn-secondary flex items-center justify-center gap-2 text-sm border-[#FFC0CB]"
                         >
-                          <i data-lucide="phone-call" className="w-5 h-5"></i> Admin 2 (Asisten)
+                          <i data-lucide="phone-call" className="w-5 h-5"></i> Admin 2 (Mas Bismo)
                         </a>
                       </div>
 
@@ -1363,6 +1494,40 @@
                 </div>
 
               </div>
+            </div>
+          )}
+
+          {/* FITUR 2: LIGHTBOX MODAL UNTUK PERBESAR GAMBAR PRODUK */}
+          {isImageZoomed && selectedProduct && (
+            <div 
+              className="fixed inset-0 z-[60] flex flex-col items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsImageZoomed(false);
+              }}
+            >
+              <div className="relative max-w-4xl w-full max-h-[85vh] flex items-center justify-center">
+                {/* Tombol Tutup Lightbox */}
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsImageZoomed(false);
+                  }} 
+                  className="absolute -top-12 right-0 md:right-4 bg-white/95 hover:bg-white text-neutral-800 p-2.5 rounded-full shadow-lg transition-transform hover:scale-105 focus:outline-none"
+                  title="Tutup Perbesar"
+                >
+                  <i data-lucide="x" className="w-6 h-6"></i>
+                </button>
+                <img 
+                  src={selectedProduct.image} 
+                  alt={selectedProduct.title} 
+                  className="max-w-full max-h-[75vh] object-contain rounded-2xl border-4 border-white shadow-2xl animate-scaleUp"
+                  onClick={(e) => e.stopPropagation()} 
+                />
+              </div>
+              <p className="text-white text-sm mt-4 font-semibold text-center select-none bg-black/50 py-1 px-4 rounded-full">
+                {selectedProduct.title}
+              </p>
             </div>
           )}
 
