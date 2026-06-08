@@ -250,7 +250,7 @@
           return { valid: false, code: "EDITOR_LINK", message: "Anda memasukkan link Editor Script/Spreadsheet! Harap lakukan deploy ulang lalu salin link Web App yang berakhiran '/exec'." };
         }
         if (!url.includes("/macros/s/") || !url.endsWith("/exec")) {
-          return { valid: false, code: "BAD_FORMAT", message: "Format URL Web App kurang tepat. Pastikan link mengandung '/macros/s/' dan diakhiri dengan '/exec'." };
+          return { valid: false, code: "BAD_FORMAT", message: "Format URL Web App kurang tepat. Pastikan link mengandung '/macros/s/' and diakhiri dengan '/exec'." };
         }
         return { valid: true, code: "OK", message: "Format URL Web App tampak sudah benar!" };
       };
