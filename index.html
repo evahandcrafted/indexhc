@@ -8,9 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300..700&family=Quicksand:wght=500;700&display=swap" rel="stylesheet">
-  <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
-  <!-- React & Babel -->
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -151,7 +149,7 @@
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useEffect, useRef } = React;
+    const { useState, useEffect, useRef, useMemo } = React;
 
     const LucideIcon = ({ name, className }) => {
       const iconRef = useRef(null);
@@ -164,6 +162,24 @@
       }, [name, className]);
 
       return <span ref={iconRef} style={{ display: 'contents' }}></span>;
+    };
+
+    // SOLUSI UTAMA: Fungsi converter cerdas dan pengompres ukuran aset gambar berbasis Google CDN.
+    // Menjamin gambar tetap muncul walau di spreadsheet tersimpan link format lama/rusak.
+    const getOptimizedImgUrl = (url, size = 500) => {
+      if (!url || url.trim() === "") return "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=500";
+      if (url.startsWith("data:image")) return url; // Untuk preview local base64
+      
+      // Ekstrak ID File Google Drive dari segala macam variasi format link (uc, file/d, open, id=)
+      const regExp = /id=([^&]+)|file\/d\/([^/]+)/;
+      const match = url.match(regExp);
+      
+      if (match) {
+        const id = match[1] || match[2];
+        // Menggunakan endpoint Thumbnail resmi Google dengan parameter size (sz) agar loading super ringan
+        return `https://drive.google.com/thumbnail?id=${id}&sz=w${size}`;
+      }
+      return url;
     };
 
     const compressImage = (base64Str, maxWidth = 800, maxHeight = 800) => {
@@ -198,10 +214,7 @@
       });
     };
 
-    // =========================================================================
-    // TEMPEL URL WEB APP GOOGLE APPS SCRIPT ANDA DI SINI
-    // =========================================================================
-    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxSnRzhwnoWyKMw8J0QDSBbDhmk2jv3_hFmPQPuecqrXt0g3ywMEdKkrtDpnf18yEcYrg/exec"; 
+    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxMFktq5BVKbsXoQUzeD-3FkaphgnhYMQoFO1HpjcAEfUyJGYQ_qw6V__uaBS4B7hDaRg/exec"; 
 
     function App() {
       const [products, setProducts] = useState([]);
@@ -252,18 +265,21 @@
         onConfirm: null
       });
 
-      const filteredProducts = products.filter(product => {
-        const matchesSearch = product.title.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesCategory = selectedCategory === 'Semua' || product.category === selectedCategory;
-        return matchesSearch && matchesCategory;
-      });
+      // Optimasi Performa Pencarian dengan useMemo agar render aplikasi tidak berat
+      const sortedProducts = useMemo(() => {
+        const filtered = products.filter(product => {
+          const matchesSearch = product.title.toLowerCase().includes(searchTerm.toLowerCase());
+          const matchesCategory = selectedCategory === 'Semua' || product.category === selectedCategory;
+          return matchesSearch && matchesCategory;
+        });
 
-      const sortedProducts = [...filteredProducts].sort((a, b) => {
-        if (sortBy === 'terlaris') return b.sold - a.sold;
-        if (sortBy === 'termurah') return a.price - b.price;
-        if (sortBy === 'termahal') return b.price - a.price;
-        return b.id - a.id; 
-      });
+        return filtered.sort((a, b) => {
+          if (sortBy === 'terlaris') return b.sold - a.sold;
+          if (sortBy === 'termurah') return a.price - b.price;
+          if (sortBy === 'termahal') return b.price - a.price;
+          return b.id - a.id; 
+        });
+      }, [products, searchTerm, selectedCategory, sortBy]);
 
       const runUrlDiagnosis = (url) => {
         if (!url || url.trim() === "") return { valid: false, code: "EMPTY", message: "Variabel GAS_API_URL masih kosong." };
@@ -315,12 +331,6 @@
           setNewCategory(categories[0]);
         }
       }, [categories]);
-
-      useEffect(() => {
-        if (typeof lucide !== 'undefined') {
-          lucide.createIcons();
-        }
-      });
 
       const sendPostRequest = async (payload) => {
         try {
@@ -475,7 +485,6 @@
 
         setIsLoading(true);
 
-        // Siapkan data bunderan imageDetails jika ada file baru yang dipilih fisik
         let imageDetails = null;
         if (selectedImageFile) {
           imageDetails = {
@@ -499,7 +508,7 @@
           const payload = {
             action: "update_product",
             product: updatedProduct,
-            imageDetails: imageDetails // Dikirim barengan satu paket!
+            imageDetails: imageDetails 
           };
 
           const result = await sendPostRequest(payload);
@@ -523,7 +532,7 @@
             title: newTitle,
             price: priceNum,
             category: newCategory || categories[0],
-            image: "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=500", // Default temp jika upload kosong
+            image: "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=500", 
             rating: 5.0,
             sold: 0,
             description: newDesc || "Tidak ada deskripsi tambahan untuk kerajinan tangan imut ini."
@@ -532,7 +541,7 @@
           const payload = {
             action: "add_product",
             product: newProduct,
-            imageDetails: imageDetails // Dikirim barengan satu paket!
+            imageDetails: imageDetails 
           };
 
           const result = await sendPostRequest(payload);
@@ -888,7 +897,7 @@
                             <div className="flex items-center gap-3">
                               <div className="w-14 h-14 bg-pink-50 rounded-xl border-2 border-pink-100 flex items-center justify-center flex-shrink-0 overflow-hidden">
                                 {newImage ? (
-                                  <img src={newImage} alt="Preview" className="w-full h-full object-cover" />
+                                  <img src={getOptimizedImgUrl(newImage, 200)} alt="Preview" className="w-full h-full object-cover" />
                                 ) : (
                                   <LucideIcon name="image" className="w-6 h-6 text-pink-300" />
                                 )}
@@ -1009,10 +1018,10 @@
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-pink-50 text-sm">
-                              {products.map((product) => (
+                              {sortedProducts.map((product) => (
                                 <tr key={product.id} className={`hover:bg-pink-50/40 transition-colors ${editingProductId === product.id ? 'bg-pink-50/70 border-l-4 border-[#FF69B4]' : ''}`}>
                                   <td className="py-3 px-3 flex items-center gap-3">
-                                    <img src={product.image} alt={product.title} className="w-10 h-10 object-cover rounded-lg border-2 border-pink-100" />
+                                    <img src={getOptimizedImgUrl(product.image, 100)} alt={product.title} className="w-10 h-10 object-cover rounded-lg border-2 border-pink-100" />
                                     <div>
                                       <div className="font-bold text-neutral-800 line-clamp-1">{product.title}</div>
                                       <div className="text-[10px] text-neutral-400 font-semibold">{product.sold || 0} views</div>
@@ -1209,9 +1218,10 @@
                         className="clay-card flex flex-col justify-between overflow-hidden cursor-pointer bg-white"
                         onClick={() => handleOpenProductDetail(product)}
                       >
+                        {/* Dioptimalkan menggunakan ukuran w505 agar memuat cepat di grid halaman depan */}
                         <div className="aspect-square w-full overflow-hidden relative bg-[#FFF0F5]">
                           <img 
-                            src={product.image} 
+                            src={getOptimizedImgUrl(product.image, 505)} 
                             alt={product.title} 
                             className="w-full h-full object-cover" 
                             onError={(e) => {
@@ -1287,7 +1297,7 @@
               
               <div className="flex flex-col sm:flex-row items-center justify-between border-t border-pink-100 pt-6 mt-6 gap-4">
                 <p className="text-xs text-neutral-400">
-                  &copy; 2026 EvaHandcrafted. Design Website by Bismo Art .
+                  © 2026 EvaHandcrafted. Design Website by Bismo Art .
                 </p>
                 
                 <div className="flex items-center gap-4">
@@ -1404,12 +1414,12 @@
                 </button>
 
                 <div className="space-y-4">
-                  
-                  <div className="relative group aspect-video w-full overflow-hidden rounded-2xl border-4 border-pink-100 cursor-zoom-in" onClick={() => setZoomedImage(selectedProduct.image)}>
+                  {/* Dioptimalkan menggunakan ukuran w1000 untuk tampilan detail agar tetap tajam namun kompresi berjalan */}
+                  <div className="relative group aspect-video w-full overflow-hidden rounded-2xl border-4 border-pink-100 cursor-zoom-in" onClick={() => setZoomedImage(getOptimizedImgUrl(selectedProduct.image, 1000))}>
                     <img 
-                      src={selectedProduct.image} 
+                      src={getOptimizedImgUrl(selectedProduct.image, 800)} 
                       alt={selectedProduct.title} 
-                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
+                      className="w-full h-full object-cover" 
                     />
                     <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-bold gap-1.5">
                       <LucideIcon name="zoom-in" className="w-4 h-4" />
@@ -1483,7 +1493,6 @@
             </div>
           )}
 
-          {/* MODAL ZOOM GAMBAR PRODUK */}
           {zoomedImage && (
             <div 
               className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn cursor-zoom-out"
@@ -1505,7 +1514,6 @@
             </div>
           )}
 
-          {/* MODAL DETEKSI ERROR CACHING GOOGLE APPS SCRIPT */}
           {showGasVersionAlert && (
             <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fadeIn">
               <div className="clay-card bg-white max-w-lg w-full p-6 relative animate-scaleUp text-left space-y-4">
@@ -1545,7 +1553,6 @@
             </div>
           )}
 
-          {/* CUSTOM CLAY CONFIRMATION MODAL */}
           {confirmModal.show && (
             <div className="fixed inset-0 z-55 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fadeIn">
               <div className="clay-card bg-white max-w-sm w-full p-6 text-center animate-scaleUp">
