@@ -4,15 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>EvaHandcrafted - Katalog Handcraft Imut</title>
-  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Google Fonts for Cute Rounded Look -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300..700&family=Quicksand:wght=500;700&display=swap" rel="stylesheet">
-  <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
-  <!-- React & Babel -->
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -152,7 +148,6 @@
 
   <div id="root"></div>
 
-  <!-- React Application -->
   <script type="text/babel">
     const { useState, useEffect, useRef } = React;
 
@@ -204,7 +199,7 @@
     // =========================================================================
     // TEMPEL URL WEB APP GOOGLE APPS SCRIPT ANDA DI SINI
     // =========================================================================
-    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxU7PyOJfVUtbFo0tw5VXQCcHZzNcir2VW4lP59Qwlw1tW06Z4uCnZ-SCOvEYjLejA4TA/exec"; 
+    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxj1FdzmIX3RIsELzhfUPKJSDLPDbcL6iwfDuOnKZSrZlUPGaXa6psKfAhAq_LHYzeFkQ/exec"; 
 
     function App() {
       const [products, setProducts] = useState([]);
@@ -222,7 +217,6 @@
       const [isEditing, setIsEditing] = useState(false);
       const [editingProductId, setEditingProductId] = useState(null);
       const [editingProductViews, setEditingProductViews] = useState(0);
-      const [isUploadingImage, setIsUploadingImage] = useState(false); 
       const [selectedImageFile, setSelectedImageFile] = useState(null); 
       
       const [showAdminPanel, setShowAdminPanel] = useState(false);
@@ -339,9 +333,7 @@
           return await response.json();
         } catch (error) {
           console.error("Kesalahan koneksi POST GAS API:", error);
-          const errMsg = error.toString();
-          showAdminToast("❌ Terjadi masalah koneksi ke server Spreadsheet.");
-          return { status: "error", message: errMsg };
+          return { status: "error", message: "Masalah jaringan atau otorisasi server." };
         } 
       };
 
@@ -479,38 +471,15 @@
           return;
         }
 
-        setIsUploadingImage(true);
         setIsLoading(true);
 
-        let finalImageUrl = newImage; 
-        
+        // Siapkan data bunderan imageDetails jika ada file baru
+        let imageDetails = null;
         if (selectedImageFile) {
-          const uploadPayload = {
-            action: "upload_image",
+          imageDetails = {
             base64: selectedImageFile.base64,
             filename: selectedImageFile.filename
           };
-          
-          const uploadResult = await sendPostRequest(uploadPayload);
-          
-          if (uploadResult && uploadResult.status === "success") {
-            finalImageUrl = uploadResult.imageUrl;
-          } else {
-            if (uploadResult.message && (uploadResult.message.includes("tidak dikenali") || uploadResult.message.includes("tidak valid"))) {
-              setShowGasVersionAlert(true); 
-            } else if (uploadResult.message && uploadResult.message.includes("DriveApp")) {
-              showAdminToast("❌ Gagal Mengunggah: Akses Google Drive Ditolak! Harap setujui Izin DriveApp.");
-            } else {
-              showAdminToast(`❌ Gagal mengunggah gambar: ${uploadResult.message}`);
-            }
-            setIsUploadingImage(false);
-            setIsLoading(false);
-            return;
-          }
-        }
-
-        if (!finalImageUrl || finalImageUrl.trim() === "") {
-          finalImageUrl = "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=500";
         }
 
         if (isEditing) {
@@ -519,7 +488,7 @@
             title: newTitle,
             price: priceNum,
             category: newCategory || categories[0],
-            image: finalImageUrl,
+            image: newImage, 
             rating: 5.0,
             sold: editingProductViews,
             description: newDesc || "Tidak ada deskripsi tambahan untuk kerajinan tangan imut ini."
@@ -527,25 +496,24 @@
 
           const payload = {
             action: "update_product",
-            product: updatedProduct
+            product: updatedProduct,
+            imageDetails: imageDetails // Dikirim barengan satu paket!
           };
 
           const result = await sendPostRequest(payload);
-          setIsUploadingImage(false);
           setIsLoading(false);
           
-          if (result && result.status === "error" && result.message.includes("tidak dikenali")) {
-            setShowGasVersionAlert(true); 
+          if (result && result.status === "error") {
+            showAdminToast(`❌ Gagal memperbarui: ${result.message}`);
+            if (result.message.includes("DriveApp") || result.message.includes("tidak dikenali")) {
+              setShowGasVersionAlert(true);
+            }
             return;
           }
 
-          if (result && result.status === "success") {
-            showAdminToast("✨ Perubahan produk berhasil disimpan!");
-            await loadDatabase(); // REFRESH LANGSUNG DARI GOOGLE SHEETS
-            resetProductForm();
-          } else {
-            showAdminToast(`❌ Gagal memperbarui: ${result.message}`);
-          }
+          showAdminToast("✨ Perubahan produk berhasil disimpan!");
+          await loadDatabase(); 
+          resetProductForm();
 
         } else {
           const newProduct = {
@@ -553,7 +521,7 @@
             title: newTitle,
             price: priceNum,
             category: newCategory || categories[0],
-            image: finalImageUrl,
+            image: "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=500", // Default temp jika upload kosong
             rating: 5.0,
             sold: 0,
             description: newDesc || "Tidak ada deskripsi tambahan untuk kerajinan tangan imut ini."
@@ -561,25 +529,24 @@
 
           const payload = {
             action: "add_product",
-            product: newProduct
+            product: newProduct,
+            imageDetails: imageDetails // Dikirim barengan satu paket!
           };
 
           const result = await sendPostRequest(payload);
-          setIsUploadingImage(false);
           setIsLoading(false);
 
-          if (result && result.status === "error" && result.message.includes("tidak dikenali")) {
-            setShowGasVersionAlert(true); 
+          if (result && result.status === "error") {
+            showAdminToast(`❌ Gagal menyimpan: ${result.message}`);
+            if (result.message.includes("DriveApp") || result.message.includes("tidak dikenali")) {
+              setShowGasVersionAlert(true);
+            }
             return;
           }
 
-          if (result && result.status === "success") {
-            showAdminToast("✨ Produk sukses diupload & disimpan di Google Sheets!");
-            await loadDatabase(); // REFRESH LANGSUNG DARI GOOGLE SHEETS
-            resetProductForm();
-          } else {
-            showAdminToast(`❌ Gagal menyimpan: ${result.message}`);
-          }
+          showAdminToast("✨ Produk sukses disimpan di Google Sheets & Drive!");
+          await loadDatabase(); 
+          resetProductForm();
         }
       };
 
@@ -717,7 +684,7 @@
             {isLoading ? (
               <span className="flex items-center justify-center gap-2">
                 <span className="w-2.5 h-2.5 bg-yellow-300 rounded-full animate-ping"></span>
-                Memproses Perubahan Database...
+                Sinkronisasi Database Cloud...
               </span>
             ) : apiConnected ? (
               "🌸 Database Google Sheets Terhubung - Katalog Sinkron Secara Real-time 🌸"
@@ -954,19 +921,13 @@
                           <div className="flex flex-col gap-2 pt-2 border-t-2 border-dashed border-pink-100">
                             <button 
                               type="submit" 
-                              className="w-full py-3 font-bold clay-btn disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                              disabled={categories.length === 0 || isUploadingImage}
+                              className="w-full py-3 font-bold clay-btn disabled:opacity-50 flex items-center justify-center gap-2"
+                              disabled={categories.length === 0}
                             >
-                              {isUploadingImage ? (
-                                <><LucideIcon name="loader-2" className="w-4 h-4 animate-spin" /> Mengunggah & Menyimpan...</>
-                              ) : isEditing ? (
-                                "Simpan Perubahan 💾"
-                              ) : (
-                                "Upload & Simpan Produk ✨"
-                              )}
+                              {isEditing ? "Simpan Perubahan 💾" : "Upload & Simpan Produk ✨"}
                             </button>
                             
-                            {isEditing && !isUploadingImage && (
+                            {isEditing && (
                               <button 
                                 type="button"
                                 onClick={handleCancelEdit}
@@ -1549,23 +1510,23 @@
                 <div className="flex items-center gap-3 border-b-2 border-red-100 pb-3">
                   <span className="text-3xl">⚠️</span>
                   <div>
-                    <h3 className="text-lg font-bold font-cute text-red-500">Langkah Otorisasi Tertunda!</h3>
-                    <p className="text-xs text-neutral-400">Pembaruan produk atau Izin File Upload ditolak.</p>
+                    <h3 className="text-lg font-bold font-cute text-red-500">Langkah Otorisasi / Penerapan Tertunda!</h3>
+                    <p className="text-xs text-neutral-400">Pembaruan produk terhenti oleh sistem keamanan cloud.</p>
                   </div>
                 </div>
                 
                 <div className="text-xs text-neutral-600 space-y-3 leading-relaxed">
                   <p>
-                    Hal ini terjadi karena Anda baru saja memperbarui Google Apps Script, tetapi <strong>belum memberikan izin akses penyimpanan ke Google Drive (`DriveApp`)</strong> dan tidak menyebarkan versi baru.
+                    Hal ini terjadi karena Anda baru saja memperbarui Google Apps Script, tetapi **belum menyebarkan kodenya ke versi publik yang baru**.
                   </p>
                   <div className="bg-red-50 p-3 rounded-xl border border-red-100 space-y-1.5 text-[11px] text-red-700">
-                    <p className="font-bold">📋 Cara Mengatasi (Hanya sekali):</p>
+                    <p className="font-bold">📋 WAJIB: Lakukan Deployment Baru Sekarang:</p>
                     <ol className="list-decimal list-inside space-y-1">
-                      <li>Buka halaman editor <strong>Google Apps Script</strong> Anda.</li>
-                      <li>Di bagian atas, di sebelah tombol <strong>Terapkan (Deploy)</strong>, ada menu dropdown untuk memilih fungsi. Pilih fungsi <code>initDatabase</code>.</li>
-                      <li>Klik tombol <strong>Jalankan (Run)</strong>. Ini akan memicu popup "Otorisasi Diperlukan".</li>
-                      <li>Pilih akun Google Anda > Klik "Lanjutan (Advanced)" > Klik "Lanjutkan ke Skrip...". Kemudian izinkan semuanya.</li>
-                      <li>Klik ikon <strong>Pensil (Edit)</strong> pada <strong>Kelola Penerapan (Manage deployments)</strong>. Ubah Version menjadi <strong>New version (Versi baru)</strong>, lalu Deploy.</li>
+                      <li>Buka editor **Google Apps Script** Anda.</li>
+                      <li>Klik tombol **Terapkan (Deploy)** di pojok kanan atas, pilih **Kelola Penerapan (Manage deployments)**.</li>
+                      <li>Klik ikon **Pensil (Edit)** di kanan atas popup.</li>
+                      <li>Pada menu dropdown Versi (Version), pilih **Versi Baru (New version)**.</li>
+                      <li>Klik tombol **Terapkan (Deploy)**.</li>
                     </ol>
                   </div>
                 </div>
