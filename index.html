@@ -1,302 +1,1789 @@
-/**
- * ==========================================
- * EVAHANDCRAFTED DATABASE CONTROLLER (GAS)
- * ==========================================
- * Hubungkan skrip ini ke Google Spreadsheet Anda.
- * Skrip ini bertindak sebagai API Backend tanpa server (serverless API)
- * yang menangani operasi CRUD untuk Produk, Kategori, Kredensial, dan UPLOAD GAMBAR DRIVE.
- */
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EvaHandcrafted - Katalog Handcraft Imut</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts for Cute Rounded Look -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300..700&family=Quicksand:wght=500;700&display=swap" rel="stylesheet">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- React & Babel -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-// =========================================================================
-// PENTING: Jika skrip ini dibuat dari luar Google Spreadsheet Anda 
-// (Standalone Script di script.google.com), masukkan ID Spreadsheet Anda di bawah ini!
-var SPREADSHEET_ID = "117u02QSLw02sj9vk1gWRixWDWK1Q3LOz0L8uHaIRkGo"; 
-// =========================================================================
+  <style>
+    body {
+      font-family: 'Quicksand', sans-serif;
+      background-color: #FFF0F5; /* Lavender Blush / Light Pink */
+    }
+    .font-cute {
+      font-family: 'Fredoka', sans-serif;
+    }
+    
+    /* Claymorphism Soft Style Effect */
+    .clay-card {
+      background: #ffffff;
+      border: 4px solid #FFD1DC; /* Pastel Pink Border */
+      border-radius: 24px;
+      box-shadow: 
+        inset -6px -6px 12px rgba(255, 182, 193, 0.4),
+        inset 6px 6px 12px rgba(255, 255, 255, 0.9),
+        8px 8px 20px rgba(255, 105, 180, 0.15);
+      transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    
+    .clay-card:hover {
+      transform: translateY(-6px) scale(1.01);
+      box-shadow: 
+        inset -8px -8px 16px rgba(255, 182, 193, 0.5),
+        inset 8px 8px 16px rgba(255, 255, 255, 0.9),
+        12px 12px 24px rgba(255, 105, 180, 0.25);
+    }
 
-/**
- * Fungsi helper aman untuk mengambil spreadsheet aktif atau menggunakan ID fallback.
- */
-function getSpreadsheet() {
-  var ss = null;
-  try {
-    ss = SpreadsheetApp.getActiveSpreadsheet();
-  } catch(e) {}
-  
-  if (!ss && SPREADSHEET_ID && SPREADSHEET_ID.trim() !== "") {
-    try {
-      ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-    } catch(e) {}
-  }
-  
-  if (!ss) {
-    throw new Error("Spreadsheet tidak ditemukan! Pastikan skrip ini dihubungkan langsung ke Spreadsheet.");
-  }
-  return ss;
-}
+    .clay-btn {
+      background: #FFB6C1; /* Light Pink */
+      color: #FFFFFF;
+      border: 3px solid #FF99AA;
+      border-radius: 16px;
+      box-shadow: 
+        inset -4px -4px 8px rgba(219, 112, 147, 0.5),
+        inset 4px 4px 8px rgba(255, 255, 255, 0.6),
+        4px 4px 10px rgba(255, 105, 180, 0.2);
+      text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+      transition: all 0.2s ease;
+    }
 
-function doGet(e) {
-  initDatabase();
-  var data = getAllData();
-  return handleResponse({
-    status: "success",
-    products: data.products,
-    categories: data.categories
-  });
-}
+    .clay-btn:hover {
+      background: #FFA0B0;
+      transform: translateY(2px);
+      box-shadow: 
+        inset -2px -2px 4px rgba(219, 112, 147, 0.6),
+        inset 2px 2px 4px rgba(255, 255, 255, 0.7),
+        2px 2px 5px rgba(255, 105, 180, 0.1);
+    }
 
-function doPost(e) {
-  initDatabase();
-  
-  try {
-    var postData = JSON.parse(e.postData.contents);
-    var action = postData.action;
+    .clay-btn-secondary {
+      background: #FFF0F5;
+      color: #FF69B4;
+      border: 3px solid #FFC0CB;
+      border-radius: 16px;
+      box-shadow: 
+        inset -4px -4px 8px rgba(255, 192, 203, 0.5),
+        inset 4px 4px 8px rgba(255, 255, 255, 0.9),
+        4px 4px 10px rgba(0, 0, 0, 0.05);
+      transition: all 0.2s ease;
+    }
 
-    // =========================================================
-    // FITUR BARU: UPLOAD GAMBAR KE GOOGLE DRIVE
-    // =========================================================
-    if (action === "upload_image") {
-      try {
-        // ID Folder Google Drive yang Anda berikan
-        var folderId = "1U3ZMX2N7nYu-Sm-KNxv8Oe525SemX4FC"; 
-        var folder = DriveApp.getFolderById(folderId);
+    .clay-btn-secondary:hover {
+      background: #FFE4E1;
+      transform: translateY(2px);
+    }
+
+    .clay-btn-danger {
+      background: #FF8A8A;
+      color: #FFFFFF;
+      border: 3px solid #FF5C5C;
+      border-radius: 16px;
+      box-shadow: 
+        inset -4px -4px 8px rgba(200, 50, 50, 0.4),
+        inset 4px 4px 8px rgba(255, 255, 255, 0.6),
+        4px 4px 10px rgba(255, 0, 0, 0.1);
+      transition: all 0.2s ease;
+    }
+
+    .clay-btn-danger:hover {
+      background: #FF7171;
+      transform: translateY(2px);
+    }
+
+    .clay-input {
+      background: #FFFFFF;
+      border: 3px solid #FFD1DC;
+      border-radius: 16px;
+      box-shadow: 
+        inset 3px 3px 6px rgba(255, 182, 193, 0.2),
+        2px 2px 5px rgba(0, 0, 0, 0.02);
+      transition: all 0.3s ease;
+    }
+
+    .clay-input:focus {
+      outline: none;
+      border-color: #FF69B4;
+      box-shadow: 
+        inset 3px 3px 6px rgba(255, 105, 180, 0.2),
+        0 0 10px rgba(255, 105, 180, 0.2);
+    }
+
+    /* CSS Keyframe Animations */
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    
+    @keyframes scaleUp {
+      from { transform: scale(0.95); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    .animate-fadeIn {
+      animation: fadeIn 0.2s ease-out forwards;
+    }
+
+    .animate-scaleUp {
+      animation: scaleUp 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+
+    /* Loading Spinner */
+    .loader {
+      border: 4px solid #FFF0F5;
+      border-top: 4px solid #FF69B4;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body class="text-neutral-700">
+
+  <div id="root"></div>
+
+  <!-- React Application -->
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // =========================================================================
+    // TEMPEL URL WEB APP GOOGLE APPS SCRIPT ANDA DI SINI
+    // =========================================================================
+    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwq5WKeDQwjAgan8oGKJk46RKiIvJXBkQ2DV8jPQlB0dg5QGdYEQKpeSrw5fPm7D2HtXw/exec"; 
+    // Ganti nilai di atas dengan URL Web App milik Anda yang di-deploy di GAS.
+
+    function App() {
+      // 1. STATE MANAGEMENT
+      const [products, setProducts] = useState([]);
+      const [categories, setCategories] = useState([]);
+      const [isLoading, setIsLoading] = useState(true);
+      const [apiConnected, setApiConnected] = useState(false);
+      const [apiError, setApiError] = useState(''); 
+      
+      // New: Simulasi Demo Offline state (agar user bisa langsung simulasi di Preview!)
+      const [isDemoMode, setIsDemoMode] = useState(false);
+      const [demoCredentials, setDemoCredentials] = useState({ username: "admin", password: "eva123" });
+
+      // State pencarian & filter navigasi
+      const [searchTerm, setSearchTerm] = useState('');
+      const [selectedCategory, setSelectedCategory] = useState('Semua');
+      const [sortBy, setSortBy] = useState('terkait');
+      const [selectedProduct, setSelectedProduct] = useState(null);
+      const [zoomedImage, setZoomedImage] = useState(null); 
+
+      // State Edit & Upload Produk
+      const [isEditing, setIsEditing] = useState(false);
+      const [editingProductId, setEditingProductId] = useState(null);
+      const [editingProductViews, setEditingProductViews] = useState(0);
+      const [isUploadingImage, setIsUploadingImage] = useState(false); // Indikator saat gambar dikirim ke Drive
+      const [selectedImageFile, setSelectedImageFile] = useState(null); // Penyimpan file upload fisik
+      
+      const [pendingUpdatedProduct, setPendingUpdatedProduct] = useState(null);
+
+      // State autentikasi admin panel
+      const [showAdminPanel, setShowAdminPanel] = useState(false);
+      const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
+      const [showPasswordModal, setShowPasswordModal] = useState(false);
+      const [showPasswordText, setShowPasswordText] = useState(false);
+
+      // State khusus penanganan Error Deploy GAS Caching
+      const [showGasVersionAlert, setShowGasVersionAlert] = useState(false);
+      
+      // Form Login Admin
+      const [loginUser, setLoginUser] = useState('');
+      const [loginPass, setLoginPass] = useState('');
+      const [loginError, setLoginError] = useState('');
+
+      // Form Ubah Kredensial Admin
+      const [currentPassConfirm, setCurrentPassConfirm] = useState('');
+      const [newAdminUser, setNewAdminUser] = useState('');
+      const [newAdminPass, setNewAdminPass] = useState('');
+
+      // State data input form produk
+      const [newTitle, setNewTitle] = useState('');
+      const [newPrice, setNewPrice] = useState('');
+      const [newCategory, setNewCategory] = useState('');
+      const [newImage, setNewImage] = useState(''); // Akan dipakai untuk menampilkan preview gambar
+      const [newDesc, setNewDesc] = useState('');
+      
+      // Form Tambah Kategori Baru
+      const [newCategoryInput, setNewCategoryInput] = useState('');
+
+      // Notifikasi / Toast
+      const [adminNotification, setAdminNotification] = useState('');
+
+      // Custom Confirmation Modal State
+      const [confirmModal, setConfirmModal] = useState({
+        show: false,
+        title: '',
+        message: '',
+        onConfirm: null
+      });
+
+      // ==========================================
+      // FUNGSI DIAGNOSIS FORMAT URL (ANALYZER)
+      // ==========================================
+      const runUrlDiagnosis = (url) => {
+        if (!url || url.trim() === "") {
+          return { valid: false, code: "EMPTY", message: "Variabel GAS_API_URL masih kosong." };
+        }
+        if (url.includes("YOUR_GOOGLE_APPS_SCRIPT_URL_HERE")) {
+          return { valid: false, code: "PLACEHOLDER", message: "Anda masih menggunakan URL template bawaan! Harap ganti dengan URL milik Anda." };
+        }
+        if (!url.startsWith("https://script.google.com/")) {
+          return { valid: false, code: "NOT_GOOGLE", message: "URL tidak valid. Harus dimulai dengan 'https://script.google.com/'" };
+        }
+        if (url.includes("/edit") || url.includes("/d/")) {
+          return { valid: false, code: "EDITOR_LINK", message: "Anda memasukkan link Editor Script/Spreadsheet! Harap lakukan deploy ulang lalu salin link Web App yang berakhiran '/exec'." };
+        }
+        if (!url.includes("/macros/s/") || !url.endsWith("/exec")) {
+          return { valid: false, code: "BAD_FORMAT", message: "Format URL Web App kurang tepat. Pastikan link mengandung '/macros/s/' and diakhiri dengan '/exec'." };
+        }
+        return { valid: true, code: "OK", message: "Format URL Web App tampak sudah benar!" };
+      };
+
+      const diagnosis = runUrlDiagnosis(GAS_API_URL);
+
+      // ==========================================
+      // FETCH DATA AWAL DARI GOOGLE APPS SCRIPT
+      // ==========================================
+      const loadDatabase = async (forceDemo = false) => {
+        if (forceDemo) {
+          setIsDemoMode(true);
+          setProducts([
+            {id: 1607604276001, title: "Gantungan Kunci Clay Awan Lucu", price: 25000, category: "Gantungan Kunci", image: "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=500", rating: 5.0, sold: 0, description: "Gantungan kunci awan imut handmade yang dibuat dari air dry clay berkualitas tinggi."},
+            {id: 1607604276002, title: "Piring Perhiasan Keramik Estetik Tulip", price: 48000, category: "Dekorasi Rumah", image: "https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500", rating: 5.0, sold: 0, description: "Piring kecil serbaguna untuk meletakkan cincin, kalung, atau anting dengan hiasan bunga tulip."},
+            {id: 1607604276003, title: "Cincin Manik-Manik Colorful Clay Daisy", price: 12000, category: "Aksesoris", image: "https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=500", rating: 5.0, sold: 0, description: "Cincin manik-manik elastis dengan hiasan bunga daisy clay di tengahnya."},
+            {id: 1607604276004, title: "Cermin Meja Hias Bingkai Foam Clay", price: 75000, category: "Dekorasi Rumah", image: "https://images.unsplash.com/photo-1618220179428-22790b461013?w=500", rating: 5.0, sold: 0, description: "Cermin estetik dengan bingkai bertekstur empuk mirip awan berbahan clay busa."}
+          ]);
+          setCategories(["Gantungan Kunci", "Dekorasi Rumah", "Aksesoris"]);
+          setApiConnected(true);
+          setIsLoading(false);
+          return;
+        }
+
+        if (!diagnosis.valid) {
+          setIsLoading(false);
+          setApiConnected(false);
+          setApiError(diagnosis.message);
+          return;
+        }
+
+        setIsLoading(true);
+        setApiError('');
+        try {
+          const response = await fetch(GAS_API_URL);
+          if (!response.ok) {
+            throw new Error(`Server merespon dengan status HTTP ${response.status}`);
+          }
+          const result = await response.json();
+          if (result.status === "success") {
+            setProducts(result.products || []);
+            setCategories(result.categories || []);
+            setApiConnected(true);
+          } else {
+            throw new Error(result.message || "Gagal memproses data dari spreadsheet.");
+          }
+        } catch (error) {
+          console.error("Gagal terhubung dengan server GAS API:", error);
+          setApiConnected(false);
+          setApiError(error.toString());
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      useEffect(() => {
+        loadDatabase();
+      }, []);
+
+      // Set default category on product form once categories are initialized
+      useEffect(() => {
+        if (categories.length > 0 && !newCategory) {
+          setNewCategory(categories[0]);
+        }
+      }, [categories]);
+
+      // ==========================================
+      // MANAJEMEN ICON (Lucide)
+      // ==========================================
+      useEffect(() => {
+        if (typeof lucide !== 'undefined') {
+          lucide.createIcons();
+        }
+      }, [showAdminPanel, showPasswordModal, selectedProduct, products, categories, loginError, adminNotification, showPasswordText, confirmModal, isLoading, apiConnected, apiError, isDemoMode, isEditing, zoomedImage, showGasVersionAlert, newImage]);
+
+      // ==========================================
+      // LOGIKA FILTER & SORTING
+      // ==========================================
+      const filteredProducts = products.filter(product => {
+        const matchesSearch = product.title.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesCategory = selectedCategory === 'Semua' || product.category === selectedCategory;
+        return matchesSearch && matchesCategory;
+      });
+
+      const sortedProducts = [...filteredProducts].sort((a, b) => {
+        if (sortBy === 'terlaris') return b.sold - a.sold;
+        if (sortBy === 'termurah') return a.price - b.price;
+        if (sortBy === 'termahal') return b.price - a.price;
+        return b.id - a.id; // Terkait / Produk Terbaru
+      });
+
+      // ==========================================
+      // INTEGRASI POST REQUEST KE GOOGLE SHEETS
+      // ==========================================
+      const sendPostRequest = async (payload) => {
+        if (isDemoMode) {
+          // Simulate connection delay
+          await new Promise(resolve => setTimeout(resolve, 800));
+          
+          if (payload.action === "upload_image") {
+            // Dalam mode simulasi, kita langsung pakai Base64 sebagai imageURL
+            return { status: "success", imageUrl: payload.base64 };
+          }
+          if (payload.action === "admin_login") {
+            if (payload.username === demoCredentials.username && payload.password === demoCredentials.password) {
+              return { status: "success", authorized: true };
+            } else {
+              return { status: "error", authorized: false, message: "Username atau password salah!" };
+            }
+          }
+          if (payload.action === "update_credentials") {
+            if (payload.currentPassword !== demoCredentials.password) {
+              return { status: "error", message: "Password verifikasi saat ini salah!" };
+            }
+            setDemoCredentials({ username: payload.newUsername, password: payload.newPassword });
+            return { status: "success", message: "Kredensial admin simulasi berhasil diperbarui!" };
+          }
+          return { status: "success" };
+        }
+
+        try {
+          const response = await fetch(GAS_API_URL, {
+            method: "POST",
+            mode: "cors",
+            headers: {
+              "Content-Type": "text/plain;charset=utf-8",
+            },
+            body: JSON.stringify(payload)
+          });
+          const result = await response.json();
+          return result;
+        } catch (error) {
+          console.error("Kesalahan koneksi POST GAS API:", error);
+          showAdminToast("❌ Terjadi masalah koneksi ke server Spreadsheet.");
+          return { status: "error", message: error.toString() };
+        } 
+      };
+
+      // ==========================================
+      // PENANGANAN INPUT FILE GAMBAR
+      // ==========================================
+      const handleImageFileChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          // Validasi Ukuran (Max 3MB untuk menghindari Error Payload GAS)
+          if (file.size > 3 * 1024 * 1024) {
+            showAdminToast("❌ Gagal: Ukuran gambar maksimal 3MB!");
+            e.target.value = ""; // reset input
+            return;
+          }
+          
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            setNewImage(reader.result); // Pakai base64 untuk memunculkan preview gambar secara instan
+            setSelectedImageFile({
+              filename: file.name,
+              base64: reader.result
+            });
+          };
+          reader.readAsDataURL(file);
+        }
+      };
+
+      // ==========================================
+      // PENAMBAHAN VIEW COUNT SECARA DINAMIS
+      // ==========================================
+      const handleOpenProductDetail = async (product) => {
+        const updatedViews = (product.sold || 0) + 1;
+        const updatedProduct = { ...product, sold: updatedViews };
+
+        setProducts(prevProducts => prevProducts.map(p => p.id === product.id ? updatedProduct : p));
+        setSelectedProduct(updatedProduct);
+
+        if (!isDemoMode && apiConnected) {
+          try {
+            fetch(GAS_API_URL, {
+              method: "POST",
+              mode: "cors",
+              headers: {
+                "Content-Type": "text/plain;charset=utf-8",
+              },
+              body: JSON.stringify({
+                action: "update_product",
+                product: updatedProduct
+              })
+            });
+          } catch (e) {
+            console.error("Gagal memperbarui jumlah penayangan di spreadsheet:", e);
+          }
+        }
+      };
+
+      // ==========================================
+      // PROSES LOGIN & LOGOUT ADMIN
+      // ==========================================
+      const handleAdminToggleClick = () => {
+        if (showAdminPanel) {
+          setShowAdminPanel(false);
+        } else {
+          if (!isAdminAuthenticated) {
+            setShowPasswordModal(true);
+          } else {
+            setShowAdminPanel(true);
+          }
+        }
+      };
+
+      const handleLoginSubmit = async (e) => {
+        e.preventDefault();
+        setLoginError('');
+        setIsLoading(true);
         
-        var data = postData.base64;
-        var type = data.split(';')[0].split(':')[1];
-        var bytes = Utilities.base64Decode(data.split(',')[1]);
-        var blob = Utilities.newBlob(bytes, type, postData.filename);
+        const payload = {
+          action: "admin_login",
+          username: loginUser,
+          password: loginPass
+        };
+
+        const result = await sendPostRequest(payload);
+        setIsLoading(false);
         
-        var file = folder.createFile(blob);
-        // Mengubah izin file agar bisa diakses oleh siapa saja yang memiliki tautan (Bisa tampil di web)
-        file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+        if (result.status === "success" && (result.authorized || isDemoMode)) {
+          setIsAdminAuthenticated(true);
+          setShowPasswordModal(false);
+          setShowAdminPanel(true);
+          setLoginUser('');
+          setLoginPass('');
+          showAdminToast("🔓 Selamat Datang, Owner EvaHandcrafted!");
+        } else {
+          setLoginError(result.message || 'Kredensial salah!');
+        }
+      };
+
+      const handleLogoutAdmin = () => {
+        setIsAdminAuthenticated(false);
+        setShowAdminPanel(false);
+        setIsEditing(false);
+        resetProductForm();
+        showAdminToast("🔒 Anda telah keluar dari mode admin.");
+      };
+
+      // ==========================================
+      // EDIT KREDENSIAL ADMIN SPREADSHEET
+      // ==========================================
+      const handleUpdateCredentials = async (e) => {
+        e.preventDefault();
+        const nextUser = newAdminUser.trim();
+        const nextPass = newAdminPass.trim();
+
+        if (!nextUser || !nextPass) {
+          showAdminToast("❌ Username dan password baru tidak boleh kosong!");
+          return;
+        }
+
+        setIsLoading(true);
+        const payload = {
+          action: "update_credentials",
+          currentPassword: currentPassConfirm,
+          newUsername: nextUser,
+          newPassword: nextPass
+        };
+
+        const result = await sendPostRequest(payload);
+        setIsLoading(false);
+
+        if (result.status === "success") {
+          setCurrentPassConfirm('');
+          setNewAdminUser('');
+          setNewAdminPass('');
+          showAdminToast(isDemoMode ? "✅ Akun Admin berhasil diperbarui lokal (Simulasi)!" : "✅ Akun Admin berhasil diperbarui di Google Sheets!");
+        } else {
+          showAdminToast(`❌ Gagal: ${result.message}`);
+        }
+      };
+
+      // ==========================================
+      // MANAJEMEN PRODUK SPREADSHEET (TAMBAH & EDIT) + UPLOAD
+      // ==========================================
+      const handleAddOrEditProduct = async (e) => {
+        e.preventDefault();
+        if (!newTitle || !newPrice) {
+          showAdminToast("❌ Mohon isi judul dan harga produk!");
+          return;
+        }
+
+        const priceNum = parseFloat(newPrice);
+        if (isNaN(priceNum) || priceNum <= 0) {
+          showAdminToast("❌ Harga harus berupa angka positif!");
+          return;
+        }
+
+        setIsUploadingImage(true);
+        setIsLoading(true);
+
+        let finalImageUrl = newImage; // Default memakai URL gambar yang saat ini tampil di preview
         
-        // Membuat Tautan Akses Langsung (Direct Link) untuk tag <img>
-        var fileUrl = "https://drive.google.com/uc?export=view&id=" + file.getId();
+        // JIKA ADA FILE FISIK YANG BARU SAJA DI PILIH, UPLOAD KE GOOGLE DRIVE DULU!
+        if (selectedImageFile) {
+          const uploadPayload = {
+            action: "upload_image",
+            base64: selectedImageFile.base64,
+            filename: selectedImageFile.filename
+          };
+          
+          const uploadResult = await sendPostRequest(uploadPayload);
+          
+          if (uploadResult.status === "success") {
+            finalImageUrl = uploadResult.imageUrl;
+          } else {
+            // Deteksi Error Izin Google Drive yang paling umum terjadi (Exception: You do not have permission...)
+            if(uploadResult.message && uploadResult.message.includes("DriveApp")) {
+               showAdminToast("❌ Gagal Mengunggah: Akses Google Drive Ditolak! Harap redeploy skrip Anda dan setujui Izin DriveApp.");
+            } else {
+               showAdminToast(`❌ Gagal mengunggah gambar: ${uploadResult.message}`);
+            }
+            setIsUploadingImage(false);
+            setIsLoading(false);
+            return; // Hentikan proses simpan produk
+          }
+        }
+
+        // Pastikan tidak kosong jika belum pernah diisi
+        if (!finalImageUrl || finalImageUrl.trim() === "") {
+          finalImageUrl = "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=500";
+        }
+
+        if (isEditing) {
+          const updatedProduct = {
+            id: editingProductId,
+            title: newTitle,
+            price: priceNum,
+            category: newCategory || categories[0],
+            image: finalImageUrl,
+            rating: 5.0,
+            sold: editingProductViews,
+            description: newDesc || "Tidak ada deskripsi tambahan untuk kerajinan tangan imut ini."
+          };
+
+          const payload = {
+            action: "update_product",
+            product: updatedProduct
+          };
+
+          const result = await sendPostRequest(payload);
+          setIsUploadingImage(false);
+          setIsLoading(false);
+          
+          if (result.status === "error" && result.message.includes("tidak dikenali")) {
+            setPendingUpdatedProduct(updatedProduct); 
+            setShowGasVersionAlert(true); 
+            return;
+          }
+
+          if (result.status === "success") {
+            showAdminToast("✨ Perubahan produk berhasil disimpan!");
+            setProducts(prevProducts => prevProducts.map(p => p.id === editingProductId ? updatedProduct : p));
+            resetProductForm();
+            if (!isDemoMode) await loadDatabase();
+          } else {
+            showAdminToast(`❌ Gagal memperbarui: ${result.message}`);
+          }
+
+        } else {
+          const newProduct = {
+            id: Date.now(),
+            title: newTitle,
+            price: priceNum,
+            category: newCategory || categories[0],
+            image: finalImageUrl,
+            rating: 5.0,
+            sold: 0,
+            description: newDesc || "Tidak ada deskripsi tambahan untuk kerajinan tangan imut ini."
+          };
+
+          const payload = {
+            action: "add_product",
+            product: newProduct
+          };
+
+          const result = await sendPostRequest(payload);
+          setIsUploadingImage(false);
+          setIsLoading(false);
+
+          if (result.status === "error" && result.message.includes("tidak dikenali")) {
+            setShowGasVersionAlert(true); 
+            return;
+          }
+
+          if (result.status === "success") {
+            showAdminToast(isDemoMode ? "✨ Produk sukses ditambahkan secara lokal!" : "✨ Produk sukses diupload & disimpan di Google Sheets!");
+            setProducts(prevProducts => [...prevProducts, newProduct]);
+            resetProductForm();
+            if (!isDemoMode) await loadDatabase();
+          } else {
+            showAdminToast(`❌ Gagal menyimpan: ${result.message}`);
+          }
+        }
+      };
+
+      const handleForceSaveLocal = () => {
+        if (pendingUpdatedProduct) {
+          setProducts(prevProducts => prevProducts.map(p => p.id === pendingUpdatedProduct.id ? pendingUpdatedProduct : p));
+          showAdminToast("⚡ Perubahan berhasil dipaksa simpan secara lokal!");
+          resetProductForm();
+          setPendingUpdatedProduct(null);
+        }
+        setShowGasVersionAlert(false);
+      };
+
+      const handleEditClick = (product) => {
+        setIsEditing(true);
+        setEditingProductId(product.id);
+        setEditingProductViews(product.sold || 0);
         
-        return handleResponse({ status: "success", imageUrl: fileUrl });
-      } catch (err) {
-        return handleResponse({ status: "error", message: "Gagal mengunggah ke Drive: " + err.toString() });
-      }
-    }
-    
-    if (action === "get_data") {
-      var data = getAllData();
-      return handleResponse({ status: "success", products: data.products, categories: data.categories });
-    }
-    
-    if (action === "admin_login") {
-      var credentials = getAdminCredentials();
-      if (postData.username === credentials.username && postData.password === credentials.password) {
-        return handleResponse({ status: "success", authorized: true, message: "Login Berhasil!" });
-      } else {
-        return handleResponse({ status: "error", authorized: false, message: "Username atau password salah!" });
-      }
-    }
-    
-    if (action === "update_credentials") {
-      var credentials = getAdminCredentials();
-      if (postData.currentPassword !== credentials.password) {
-        return handleResponse({ status: "error", message: "Password verifikasi saat ini salah!" });
-      }
-      updateAdminCredentials(postData.newUsername, postData.newPassword);
-      return handleResponse({ status: "success", message: "Kredensial admin berhasil diperbarui!" });
-    }
-    
-    if (action === "add_product") {
-      addProduct(postData.product);
-      return handleResponse({ status: "success", message: "Produk berhasil ditambahkan ke Spreadsheet!" });
+        setNewTitle(product.title);
+        setNewPrice(product.price);
+        setNewCategory(product.category);
+        setNewImage(product.image); // Masukkan link gambar yg ada ke state agar muncul di preview
+        setSelectedImageFile(null); // Kosongkan state file fisik
+        setNewDesc(product.description);
+        
+        showAdminToast(`📝 Mode Edit: "${product.title}"`);
+        window.scrollTo({ top: 120, behavior: 'smooth' });
+      };
+
+      const handleCancelEdit = () => {
+        resetProductForm();
+        showAdminToast("ℹ️ Mode edit dibatalkan.");
+      };
+
+      const resetProductForm = () => {
+        setIsEditing(false);
+        setEditingProductId(null);
+        setEditingProductViews(0);
+        setNewTitle('');
+        setNewPrice('');
+        setNewImage('');
+        setSelectedImageFile(null);
+        setNewDesc('');
+        
+        // Reset the file input element visually
+        const fileInput = document.getElementById('imageUploader');
+        if (fileInput) fileInput.value = "";
+
+        if (categories.length > 0) {
+          setNewCategory(categories[0]);
+        }
+      };
+
+      const handleDeleteProduct = (id) => {
+        setConfirmModal({
+          show: true,
+          title: 'Hapus Produk dari Katalog?',
+          message: isDemoMode ? 'Hapus produk ini secara lokal?' : 'Apakah Anda yakin ingin menghapus produk ini secara permanen dari Google Sheets?',
+          onConfirm: async () => {
+            setIsLoading(true);
+            const payload = {
+              action: "delete_product",
+              productId: id
+            };
+            const result = await sendPostRequest(payload);
+            setIsLoading(false);
+
+            if (result.status === "success") {
+              showAdminToast("🗑️ Produk berhasil dihapus.");
+              setProducts(prevProducts => prevProducts.filter(p => p.id !== id));
+              if (isEditing && editingProductId === id) {
+                resetProductForm();
+              }
+              if (!isDemoMode) await loadDatabase();
+            } else {
+              showAdminToast(`❌ Gagal menghapus: ${result.message}`);
+            }
+          }
+        });
+      };
+
+      // ==========================================
+      // MANAJEMEN KATEGORI SPREADSHEET
+      // ==========================================
+      const handleAddCategory = async (e) => {
+        e.preventDefault();
+        const cleanCategory = newCategoryInput.trim();
+        if (!cleanCategory) return;
+
+        if (categories.some(cat => cat.toLowerCase() === cleanCategory.toLowerCase())) {
+          showAdminToast("⚠️ Kategori tersebut sudah terdaftar!");
+          return;
+        }
+
+        setIsLoading(true);
+        const payload = {
+          action: "add_category",
+          categoryName: cleanCategory
+        };
+
+        const result = await sendPostRequest(payload);
+        setIsLoading(false);
+
+        if (result.status === "success") {
+          setNewCategoryInput('');
+          showAdminToast(`✨ Kategori "${cleanCategory}" berhasil disimpan!`);
+          setCategories(prevCategories => [...prevCategories, cleanCategory]);
+          if (!isDemoMode) await loadDatabase();
+        } else {
+          showAdminToast(`❌ Gagal menyimpan kategori: ${result.message}`);
+        }
+      };
+
+      const handleDeleteCategory = (catToDelete) => {
+        setConfirmModal({
+          show: true,
+          title: `Hapus Kategori "${catToDelete}"?`,
+          message: 'Kategori akan dihapus secara permanen dari daftar.',
+          onConfirm: async () => {
+            setIsLoading(true);
+            const payload = {
+              action: "delete_category",
+              categoryName: catToDelete
+            };
+            const result = await sendPostRequest(payload);
+            setIsLoading(false);
+
+            if (result.status === "success") {
+              showAdminToast("🗑️ Kategori berhasil terhapus.");
+              setCategories(prevCategories => prevCategories.filter(c => c !== catToDelete));
+              if (!isDemoMode) await loadDatabase();
+            } else {
+              showAdminToast(`❌ Gagal menghapus: ${result.message}`);
+            }
+          }
+        });
+      };
+
+      const showAdminToast = (msg) => {
+        setAdminNotification(msg);
+        setTimeout(() => setAdminNotification(''), 4000);
+      };
+
+      const formatRupiah = (num) => {
+        return "Rp " + num.toLocaleString('id-ID');
+      };
+
+      return (
+        <div className="min-h-screen flex flex-col justify-between">
+          
+          {/* BANNER STATUS KONEKSI */}
+          <div className={`${isDemoMode ? 'bg-[#FF69B4]' : apiConnected ? 'bg-[#FFB6C1]' : 'bg-amber-500'} text-white py-1.5 px-4 text-xs md:text-sm text-center font-semibold tracking-wide`}>
+            {isLoading ? (
+              <span className="flex items-center justify-center gap-2">
+                <span className="w-2.5 h-2.5 bg-yellow-300 rounded-full animate-ping"></span>
+                Memproses Perubahan Database...
+              </span>
+            ) : isDemoMode ? (
+              "⭐ Mode Simulasi Demo Offline Aktif ⭐"
+            ) : apiConnected ? (
+              "🌸 Database Google Sheets Terhubung - Katalog Sinkron Secara Real-time 🌸"
+            ) : (
+              "⚠️ API Google Sheets Belum Dikonfigurasi / Tidak Terhubung!"
+            )}
+          </div>
+
+          {/* NAVBAR UTAMA */}
+          <header className="sticky top-0 z-40 bg-[#FFF0F5]/95 backdrop-blur-md border-b-4 border-[#FFD1DC] px-4 py-3 md:py-4 transition-all">
+            <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+              
+              {/* Logo */}
+              <div className="flex items-center gap-3 cursor-pointer" onClick={() => { setShowAdminPanel(false); setSelectedCategory('Semua'); }}>
+                <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center border-4 border-[#FFD1DC] shadow-[2px_2px_0px_#FFD1DC]">
+                  <span className="text-2xl">🧸</span>
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold font-cute text-[#FF69B4] tracking-wide leading-none">EvaHandcrafted</h1>
+                  <p className="text-xs text-neutral-500 font-medium mt-0.5">Spesialis kerajinan tangan dan Wedding Card</p>
+                </div>
+              </div>
+
+              {/* Bar Pencarian */}
+              {!showAdminPanel && (
+                <div className="relative w-full md:w-80 flex items-center">
+                  <input 
+                    type="text" 
+                    placeholder="Cari katalog handcraft estetik..." 
+                    className="w-full py-2 pl-4 pr-10 clay-input text-sm"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                  <button className="absolute right-3 text-[#FF69B4] hover:scale-110 transition-transform">
+                    <i data-lucide="search" className="w-5 h-5"></i>
+                  </button>
+                </div>
+              )}
+
+              {/* Menu Navigasi - Halaman Admin */}
+              <div className="flex items-center gap-2">
+                {showAdminPanel && (
+                  <button 
+                    onClick={() => { setShowAdminPanel(false); resetProductForm(); }}
+                    className="px-4 py-2 text-sm font-bold clay-btn-secondary flex items-center gap-2"
+                  >
+                    <i data-lucide="home" className="w-4 h-4"></i>
+                    Lihat Toko
+                  </button>
+                )}
+              </div>
+
+            </div>
+          </header>
+
+          {/* LOADING SCREEN KHUSUS AWAL LOAD */}
+          {isLoading && products.length === 0 ? (
+            <div className="flex-grow flex flex-col items-center justify-center gap-4 py-20">
+              <div className="loader"></div>
+              <p className="font-bold text-[#FF69B4] animate-pulse">Menghubungi Google Spreadsheet Database...</p>
+            </div>
+          ) : !apiConnected ? (
+            
+            // =========================================================================
+            // LAYAR DIAGNOSIS ERROR INTERAKTIF + TOMBOL SIMULASI DEMO
+            // =========================================================================
+            <div className="flex-grow flex items-center justify-center p-4">
+              <div className="clay-card p-6 md:p-8 max-w-2xl w-full space-y-6 bg-white my-8">
+                <div className="flex flex-col items-center text-center space-y-3">
+                  <span className="text-5xl animate-bounce">⚙️</span>
+                  <h3 className="text-2xl font-bold font-cute text-[#FF69B4]">Pusat Diagnosis Koneksi Database</h3>
+                  <p className="text-sm text-neutral-500 max-w-md">
+                    Kami mendeteksi bahwa halaman web belum terhubung dengan Backend Google Apps Script milik Anda.
+                  </p>
+                </div>
+
+                {/* TOMBOL EMAS: MENCOBA MODE SIMULASI */}
+                <div className="bg-pink-50 p-4 rounded-2xl border-2 border-dashed border-[#FFB6C1] text-center space-y-3">
+                  <h4 className="font-bold text-[#FF69B4] text-sm">💡 Ingin Mencoba Simulasi Langsung?</h4>
+                  <p className="text-xs text-neutral-600">
+                    Gunakan Mode Simulasi Demo Offline untuk mencoba menambahkan produk, mengedit produk, menghapus, login admin, menambah jumlah view, dan menguji seluruh desain fitur aplikasi di browser sekarang tanpa setup database!
+                  </p>
+                  <button 
+                    onClick={() => loadDatabase(true)}
+                    className="w-full py-2.5 px-4 font-cute font-bold text-sm text-white bg-[#FF69B4] hover:bg-[#FFA0B0] rounded-xl shadow-md flex items-center justify-center gap-2 transition-transform hover:scale-102"
+                  >
+                    <i data-lucide="play" className="w-4 h-4 fill-white"></i> Aktifkan Mode Simulasi Demo (Offline)
+                  </button>
+                </div>
+
+                <div className="border-t-2 border-dashed border-pink-100 pt-4 space-y-4 text-xs md:text-sm">
+                  
+                  {/* Status 1: Format URL Anda */}
+                  <div className="bg-neutral-50 p-4 rounded-xl space-y-2 border border-neutral-100">
+                    <div className="font-bold text-neutral-700 flex items-center gap-2">
+                      <span className="text-neutral-400">🔍</span> URL Saat Ini di Kode:
+                    </div>
+                    <div className="bg-white p-2 rounded border border-neutral-200 font-mono text-neutral-600 break-all text-xs">
+                      {GAS_API_URL}
+                    </div>
+                    
+                    <div className="flex items-center gap-2 mt-2 pt-2 border-t border-neutral-100">
+                      <span className="font-bold text-neutral-500">Hasil Analisis URL:</span>
+                      {diagnosis.valid ? (
+                        <span className="text-emerald-500 font-bold flex items-center gap-1">
+                          🟢 Format URL Benar
+                        </span>
+                      ) : (
+                        <span className="text-red-500 font-bold flex items-center gap-1">
+                          🔴 Format URL Salah ({diagnosis.code})
+                        </span>
+                      )}
+                    </div>
+                    {!diagnosis.valid && (
+                      <p className="text-xs text-red-500 bg-red-50 p-2 rounded border border-red-100 mt-1">
+                        <strong>Solusi:</strong> {diagnosis.message}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Status 2: Pesan Error Browser Asli */}
+                  <div className="bg-red-50/50 p-4 rounded-xl border border-red-100 space-y-2">
+                    <div className="font-bold text-red-700 flex items-center gap-2">
+                      <span>⚠️</span> Pesan Error Teknis Sistem:
+                    </div>
+                    <div className="bg-white p-2 rounded border border-red-200 font-mono text-red-500 text-xs break-all">
+                      {apiError || "Tidak ada rincian pesan error browser."}
+                    </div>
+                  </div>
+
+                </div>
+
+                <div className="flex gap-2.5 pt-2">
+                  <button 
+                    onClick={() => window.location.reload()}
+                    className="w-full py-3 font-bold clay-btn flex items-center justify-center gap-2"
+                  >
+                    <i data-lucide="refresh-cw" className="w-4 h-4"></i> Segarkan Halaman
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            
+            /* ISI CONTENT UTAMA */
+            <main className="flex-grow max-w-6xl w-full mx-auto p-4 md:p-6">
+              
+              {/* JIKA MEMBUKA HALAMAN ADMIN */}
+              {showAdminPanel && isAdminAuthenticated ? (
+                <div className="space-y-8 animate-fadeIn">
+                  
+                  {/* Header Admin */}
+                  <div className="clay-card p-6 bg-gradient-to-r from-pink-50 to-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div>
+                      <h2 className="text-2xl font-bold font-cute text-[#FF69B4] flex items-center gap-2">
+                        <i data-lucide="settings" className="w-7 h-7"></i> Dashboard Admin {isDemoMode ? "(Mode Simulasi)" : "(Google Sheets Database)"}
+                      </h2>
+                      <p className="text-sm text-neutral-500 mt-1">
+                        {isDemoMode ? "Anda berada pada mode simulasi. Data disimpan di memori sementara browser." : "Kelola data produk, kategori, dan otomatis upload gambar Anda ke Google Drive."}
+                      </p>
+                    </div>
+                    <button 
+                      onClick={handleLogoutAdmin} 
+                      className="px-4 py-2 text-xs font-bold clay-btn-danger flex items-center gap-1.5"
+                    >
+                      <i data-lucide="log-out" className="w-4 h-4"></i> Keluar Admin
+                    </button>
+                  </div>
+
+                  {/* Toast Notification Admin */}
+                  {adminNotification && (
+                    <div className="bg-pink-100 border-2 border-[#FFB6C1] text-[#FF69B4] px-4 py-3 rounded-xl font-bold text-sm shadow-md flex items-center gap-2 animate-pulse">
+                      <i data-lucide="sparkles" className="w-5 h-5 text-yellow-400 fill-yellow-400"></i>
+                      {adminNotification}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    
+                    {/* Kolom Kiri: Form Produk & Kelola Kategori */}
+                    <div className="space-y-6 lg:col-span-1">
+                      
+                      {/* Form Input Tambah / Edit Produk DENGAN UPLOAD GAMBAR */}
+                      <div className="clay-card p-6 bg-white border-[#FFB6C1]">
+                        <h3 className="text-lg font-bold text-neutral-800 mb-4 pb-2 border-b-2 border-pink-100 flex items-center gap-2">
+                          <i data-lucide={isEditing ? "edit" : "plus-circle"} className="text-[#FF69B4] w-5 h-5"></i> 
+                          {isEditing ? "Edit Data Produk" : "Tambah Produk Baru"}
+                        </h3>
+                        <form onSubmit={handleAddOrEditProduct} className="space-y-4">
+                          
+                          <div>
+                            <label className="block text-xs font-bold text-neutral-500 uppercase tracking-wider mb-1">Nama Produk *</label>
+                            <input 
+                              type="text" 
+                              placeholder="Contoh: Gantungan Kunci Kucing Clay" 
+                              className="w-full p-2.5 clay-input text-sm"
+                              value={newTitle}
+                              onChange={(e) => setNewTitle(e.target.value)}
+                              required
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="block text-xs font-bold text-neutral-500 uppercase tracking-wider mb-1">Harga (Rp) *</label>
+                              <input 
+                                type="number" 
+                                placeholder="Contoh: 25000" 
+                                className="w-full p-2.5 clay-input text-sm"
+                                value={newPrice}
+                                onChange={(e) => setNewPrice(e.target.value)}
+                                required
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-bold text-neutral-500 uppercase tracking-wider mb-1">Kategori</label>
+                              <select 
+                                className="w-full p-2.5 clay-input text-sm bg-white cursor-pointer"
+                                value={newCategory}
+                                onChange={(e) => setNewCategory(e.target.value)}
+                              >
+                                {categories.map((cat) => (
+                                  <option key={cat} value={cat}>{cat}</option>
+                                ))}
+                                {categories.length === 0 && (
+                                  <option value="">Buat kategori dulu</option>
+                                )}
+                              </select>
+                            </div>
+                          </div>
+
+                          {/* SISTEM UPLOAD GAMBAR BARU KE GOOGLE DRIVE */}
+                          <div>
+                            <label className="block text-xs font-bold text-neutral-500 uppercase tracking-wider mb-1">Upload Gambar Produk (Google Drive)</label>
+                            <div className="flex items-center gap-3">
+                              {/* Thumbnail Preview */}
+                              <div className="w-14 h-14 bg-pink-50 rounded-xl border-2 border-pink-100 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                                {newImage ? (
+                                  <img src={newImage} alt="Preview" className="w-full h-full object-cover" />
+                                ) : (
+                                  <i data-lucide="image" className="w-6 h-6 text-pink-300"></i>
+                                )}
+                              </div>
+                              <div className="flex-1">
+                                <input 
+                                  type="file" 
+                                  id="imageUploader"
+                                  accept="image/png, image/jpeg, image/jpg, image/webp"
+                                  className="w-full text-sm file:mr-3 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-[#FFD1DC] file:text-[#FF69B4] hover:file:bg-[#FFB6C1] hover:file:text-white cursor-pointer file:transition-colors text-neutral-500"
+                                  onChange={handleImageFileChange}
+                                />
+                                <span className="text-[10px] text-neutral-400 mt-1.5 block leading-tight">
+                                  {isEditing ? "Abaikan jika tidak ingin mengganti gambar lama. " : "Upload foto produk dari galeri Anda. "} 
+                                  Max 3MB.
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-bold text-neutral-500 uppercase tracking-wider mb-1">Deskripsi Produk</label>
+                            <textarea 
+                              rows="3"
+                              placeholder="Tuliskan spesifikasi detail kerajinan tangan Anda..." 
+                              className="w-full p-2.5 clay-input text-sm"
+                              value={newDesc}
+                              onChange={(e) => setNewDesc(e.target.value)}
+                            ></textarea>
+                          </div>
+
+                          <div className="flex flex-col gap-2 pt-2 border-t-2 border-dashed border-pink-100">
+                            <button 
+                              type="submit" 
+                              className="w-full py-3 font-bold clay-btn disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                              disabled={categories.length === 0 || isUploadingImage}
+                            >
+                              {isUploadingImage ? (
+                                <><i data-lucide="loader-2" className="w-4 h-4 animate-spin"></i> Mengunggah & Menyimpan...</>
+                              ) : isEditing ? (
+                                "Simpan Perubahan 💾"
+                              ) : (
+                                "Upload & Simpan Produk ✨"
+                              )}
+                            </button>
+                            
+                            {isEditing && !isUploadingImage && (
+                              <button 
+                                type="button"
+                                onClick={handleCancelEdit}
+                                className="w-full py-2.5 font-bold text-xs clay-btn-secondary"
+                              >
+                                Batal Edit
+                              </button>
+                            )}
+                          </div>
+
+                        </form>
+                      </div>
+
+                      {/* Form Kelola Kategori */}
+                      <div className="clay-card p-6 bg-white">
+                        <h3 className="text-lg font-bold text-neutral-800 mb-3 pb-2 border-b-2 border-pink-100 flex items-center gap-2">
+                          <i data-lucide="tag" className="text-[#FF69B4] w-5 h-5"></i> Kelola Kategori
+                        </h3>
+                        
+                        <form onSubmit={handleAddCategory} className="flex gap-2 mb-4">
+                          <input 
+                            type="text"
+                            placeholder="Nama kategori baru..."
+                            className="flex-1 p-2 clay-input text-xs"
+                            value={newCategoryInput}
+                            onChange={(e) => setNewCategoryInput(e.target.value)}
+                            required
+                          />
+                          <button type="submit" className="px-3 py-2 text-xs font-bold clay-btn flex items-center gap-1">
+                            <i data-lucide="plus" className="w-3.5 h-3.5"></i> Tambah
+                          </button>
+                        </form>
+
+                        <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                          {categories.map((cat) => (
+                            <div key={cat} className="flex items-center justify-between p-2 bg-pink-50/50 rounded-xl border border-pink-100 text-xs text-neutral-600">
+                              <span className="font-bold">{cat}</span>
+                              <button 
+                                type="button"
+                                onClick={() => handleDeleteCategory(cat)}
+                                className="p-1 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                title="Hapus Kategori"
+                              >
+                                <i data-lucide="trash" className="w-3.5 h-3.5"></i>
+                              </button>
+                            </div>
+                          ))}
+                          {categories.length === 0 && (
+                            <div className="text-center py-4 text-xs text-neutral-400">
+                              Kategori masih kosong. Silakan buat satu!
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                    </div>
+
+                    {/* Kolom Kanan: List Produk & Ganti Kredensial Admin */}
+                    <div className="space-y-6 lg:col-span-2 flex flex-col">
+                      
+                      {/* List Produk */}
+                      <div className="clay-card p-6 bg-white flex-grow">
+                        <h3 className="text-lg font-bold text-neutral-800 mb-4 pb-2 border-b-2 border-pink-100 flex items-center justify-between">
+                          <span className="flex items-center gap-2">
+                            <i data-lucide="package" className="text-[#FF69B4] w-5 h-5"></i> List Katalog {isDemoMode ? "Simulasi" : "Spreadsheet"}
+                          </span>
+                          <span className="text-xs bg-pink-100 text-[#FF69B4] font-bold px-2.5 py-1 rounded-full">
+                            {products.length} Produk
+                          </span>
+                        </h3>
+
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left border-collapse">
+                            <thead>
+                              <tr className="border-b-2 border-pink-100 text-neutral-400 text-xs uppercase tracking-wider">
+                                <th className="py-2 px-3">Produk</th>
+                                <th className="py-2 px-3">Kategori</th>
+                                <th className="py-2 px-3 text-right">Harga</th>
+                                <th className="py-2 px-3 text-center">Aksi</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-pink-50 text-sm">
+                              {products.map((product) => (
+                                <tr key={product.id} className={`hover:bg-pink-50/40 transition-colors ${editingProductId === product.id ? 'bg-pink-50/70 border-l-4 border-[#FF69B4]' : ''}`}>
+                                  <td className="py-3 px-3 flex items-center gap-3">
+                                    <img src={product.image} alt={product.title} className="w-10 h-10 object-cover rounded-lg border-2 border-pink-100" />
+                                    <div>
+                                      <div className="font-bold text-neutral-800 line-clamp-1">{product.title}</div>
+                                      <div className="text-[10px] text-neutral-400 font-semibold">{product.sold || 0} views</div>
+                                    </div>
+                                  </td>
+                                  <td className="py-3 px-3">
+                                    <span className="bg-pink-100 text-[#FF69B4] text-xs font-semibold px-2 py-0.5 rounded-full">
+                                      {product.category}
+                                    </span>
+                                  </td>
+                                  <td className="py-3 px-3 text-right font-bold text-pink-500">
+                                    {formatRupiah(product.price)}
+                                  </td>
+                                  <td className="py-3 px-3 text-center">
+                                    <div className="flex items-center justify-center gap-2">
+                                      {/* TOMBOL EDIT DATA PRODUK */}
+                                      <button 
+                                        onClick={() => handleEditClick(product)}
+                                        className="p-1.5 clay-btn-secondary text-xs hover:scale-105 transition-transform"
+                                        title="Edit Produk"
+                                      >
+                                        <i data-lucide="pencil" className="w-3.5 h-3.5"></i>
+                                      </button>
+                                      
+                                      <button 
+                                        onClick={() => handleDeleteProduct(product.id)}
+                                        className="p-1.5 clay-btn-danger text-xs hover:scale-105 transition-transform"
+                                        title="Hapus Produk"
+                                      >
+                                        <i data-lucide="trash-2" className="w-3.5 h-3.5"></i>
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                          {products.length === 0 && (
+                            <div className="text-center py-10 text-neutral-400 font-medium">
+                              Belum ada produk terdaftar. Tambahkan beberapa produk terlebih dahulu!
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Pengaturan Akun Admin (Password & Username) */}
+                      <div className="clay-card p-6 bg-white">
+                        <h3 className="text-lg font-bold text-neutral-800 mb-3 pb-2 border-b-2 border-pink-100 flex items-center gap-2">
+                          <i data-lucide="shield-check" className="text-[#FF69B4] w-5 h-5"></i> Pengaturan Kredensial Admin {isDemoMode ? "(Simulasi)" : "Spreadsheet"}
+                        </h3>
+                        <form onSubmit={handleUpdateCredentials} className="space-y-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-xs font-bold text-neutral-500 uppercase tracking-wider mb-1">Username Baru *</label>
+                              <input 
+                                type="text" 
+                                placeholder="Username baru..." 
+                                className="w-full p-2.5 clay-input text-sm"
+                                value={newAdminUser}
+                                onChange={(e) => setNewAdminUser(e.target.value)}
+                                required
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-bold text-neutral-500 uppercase tracking-wider mb-1">Password Baru *</label>
+                              <input 
+                                type="password" 
+                                placeholder="Password baru..." 
+                                className="w-full p-2.5 clay-input text-sm"
+                                value={newAdminPass}
+                                onChange={(e) => setNewAdminPass(e.target.value)}
+                                required
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-bold text-neutral-500 uppercase tracking-wider mb-1">Verifikasi Password Saat Ini *</label>
+                            <input 
+                              type="password" 
+                              placeholder="Masukkan password saat ini untuk memverifikasi penyimpanan..." 
+                              className="w-full p-2.5 clay-input text-sm"
+                              value={currentPassConfirm}
+                              onChange={(e) => setCurrentPassConfirm(e.target.value)}
+                              required
+                            />
+                          </div>
+
+                          <button type="submit" className="w-full py-2.5 font-bold text-sm clay-btn">
+                            Simpan Perubahan Akun 🔒
+                          </button>
+                        </form>
+                      </div>
+
+                    </div>
+
+                  </div>
+
+                </div>
+              ) : (
+                // KATALOG UTAMA
+                <div className="space-y-6 animate-fadeIn">
+                  
+                  {/* HERO BANNER - Soft Pastel Clay Style */}
+                  <div className="clay-card p-6 md:p-8 bg-gradient-to-r from-pink-100 to-white flex flex-col md:flex-row items-center justify-between gap-6 overflow-hidden relative">
+                    <div className="space-y-4 max-w-lg z-10 text-center md:text-left">
+                      <span className="bg-[#FFB6C1] text-white px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">Premium Handmade Craft</span>
+                      <h2 className="text-3xl md:text-4xl font-cute font-bold text-[#FF69B4] leading-tight">
+                        Hiasi Duniamu dengan Kreativitas Tanpa Batas!
+                      </h2>
+                      <p className="text-sm md:text-base text-neutral-500">
+                        Selamat datang di <strong>EvaHandcrafted</strong>. Temukan koleksi berbagai macam kerajinan tangan seperti buket berbagai macam bentuk, Kerajinan Tangan, dan Wedding Card.
+                      </p>
+                      <button 
+                        onClick={() => {
+                          const target = document.getElementById('catalog-section');
+                          target?.scrollIntoView({ behavior: 'smooth' });
+                        }}
+                        className="px-6 py-3 font-cute font-bold text-lg clay-btn inline-flex items-center gap-2"
+                      >
+                        Jelajahi Katalog <i data-lucide="chevron-right" className="w-5 h-5"></i>
+                      </button>
+                    </div>
+                    <div className="w-48 h-48 md:w-64 md:h-64 relative flex-shrink-0">
+                      <div className="absolute inset-0 bg-[#FFD1DC] rounded-full filter blur-xl opacity-30"></div>
+                      <img 
+                        src="https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=500" 
+                        alt="Miniatur Clay Karakter Imut" 
+                        className="w-full h-full object-cover rounded-3xl border-4 border-white shadow-xl rotate-3"
+                      />
+                    </div>
+                  </div>
+
+                  {/* FILTER KATEGORI */}
+                  <div className="space-y-3" id="catalog-section">
+                    <h3 className="text-lg font-bold font-cute text-[#FF69B4] flex items-center gap-2">
+                      <i data-lucide="sparkles" className="w-5 h-5"></i> Kategori Produk
+                    </h3>
+                    <div className="flex gap-2.5 overflow-x-auto pb-2 scrollbar-none">
+                      <button
+                        onClick={() => setSelectedCategory('Semua')}
+                        className={`px-5 py-2.5 font-bold whitespace-nowrap text-sm transition-all ${
+                          selectedCategory === 'Semua' ? 'clay-btn' : 'clay-btn-secondary'
+                        }`}
+                      >
+                        Semua
+                      </button>
+                      {categories.map((cat) => (
+                        <button
+                          key={cat}
+                          onClick={() => setSelectedCategory(cat)}
+                          className={`px-5 py-2.5 font-bold whitespace-nowrap text-sm transition-all ${
+                            selectedCategory === cat ? 'clay-btn' : 'clay-btn-secondary'
+                          }`}
+                        >
+                          {cat}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* FILTER URUTKAN */}
+                  <div className="bg-white p-3 rounded-2xl border-2 border-pink-100 flex flex-wrap items-center justify-between gap-4 text-sm">
+                    <div className="flex items-center gap-3">
+                      <span className="text-neutral-400 font-medium">Urutkan:</span>
+                      <div className="flex flex-wrap gap-2">
+                        <button 
+                          onClick={() => setSortBy('terkait')} 
+                          className={`px-4 py-1.5 rounded-lg font-bold ${sortBy === 'terkait' ? 'bg-[#FFD1DC] text-[#FF69B4]' : 'bg-neutral-50 text-neutral-500 hover:bg-neutral-100'}`}
+                        >
+                          Terbaru
+                        </button>
+                        <button 
+                          onClick={() => setSortBy('terlaris')} 
+                          className={`px-4 py-1.5 rounded-lg font-bold ${sortBy === 'terlaris' ? 'bg-[#FFD1DC] text-[#FF69B4]' : 'bg-neutral-50 text-neutral-500 hover:bg-neutral-100'}`}
+                        >
+                          Paling Banyak Dilihat
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <select 
+                        className="px-3 py-1.5 rounded-lg border-2 border-pink-100 bg-white font-bold text-neutral-600 outline-none cursor-pointer"
+                        value={sortBy}
+                        onChange={(e) => setSortBy(e.target.value)}
+                      >
+                        <option value="terkait">Terbaru (Default)</option>
+                        <option value="termurah">Harga: Rendah ke Tinggi</option>
+                        <option value="termahal">Harga: Tinggi ke Rendah</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* GRID PRODUK KATALOG */}
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+                    {sortedProducts.map((product) => (
+                      <div 
+                        key={product.id} 
+                        className="clay-card flex flex-col justify-between overflow-hidden cursor-pointer bg-white"
+                        onClick={() => handleOpenProductDetail(product)}
+                      >
+                        {/* Image Frame */}
+                        <div className="aspect-square w-full overflow-hidden relative bg-[#FFF0F5]">
+                          <img 
+                            src={product.image} 
+                            alt={product.title} 
+                            className="w-full h-full object-cover" 
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.src = "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=500";
+                            }}
+                          />
+                          <div className="absolute top-2 left-2 bg-[#FFB6C1]/90 backdrop-blur-xs text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                            {product.category}
+                          </div>
+                        </div>
+
+                        {/* Info Details */}
+                        <div className="p-3 md:p-4 flex flex-col flex-grow justify-between space-y-2">
+                          <div className="space-y-1">
+                            <h4 className="text-sm font-semibold text-neutral-800 line-clamp-2 min-h-[40px]">
+                              {product.title}
+                            </h4>
+                            
+                            {/* View Count (Tanpa Rating) */}
+                            <div className="flex items-center gap-1.5 text-xs text-neutral-500">
+                              <i data-lucide="eye" className="w-3.5 h-3.5 text-[#FF69B4]"></i>
+                              <span>{product.sold || 0}x dilihat</span>
+                            </div>
+                          </div>
+
+                          <div className="space-y-2 pt-2 border-t border-pink-50">
+                            {/* Harga */}
+                            <div className="text-base font-bold text-[#FF69B4] font-cute">
+                              {formatRupiah(product.price)}
+                            </div>
+                            
+                            {/* Tombol Lihat Detail */}
+                            <button 
+                              className="w-full py-1.5 clay-btn-secondary text-xs font-bold flex items-center justify-center gap-1"
+                            >
+                              <i data-lucide="eye" className="w-3.5 h-3.5"></i> Lihat Detail
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* KONDISI JIKA PENCARIAN KOSONG */}
+                  {sortedProducts.length === 0 && (
+                    <div className="text-center py-20 bg-white rounded-3xl border-4 border-dashed border-[#FFD1DC] p-8 max-w-md mx-auto">
+                      <span className="text-5xl">😭</span>
+                      <h3 className="text-lg font-bold font-cute text-[#FF69B4] mt-4">Produk Tidak Ditemukan</h3>
+                      <p className="text-sm text-neutral-500 mt-2">
+                        Maaf, kami tidak bisa menemukan kerajinan tangan "{searchTerm}" di kategori {selectedCategory}. Coba kata kunci lainnya ya!
+                      </p>
+                      <button 
+                        onClick={() => { setSearchTerm(''); setSelectedCategory('Semua'); }}
+                        className="mt-4 px-4 py-2 font-bold clay-btn text-xs"
+                      >
+                        Reset Filter Pencarian
+                      </button>
+                    </div>
+                  )}
+
+                </div>
+              )}
+
+            </main>
+          )}
+
+          {/* FOOTER */}
+          <footer className="bg-white border-t-4 border-[#FFD1DC] mt-8 py-8 px-4 text-center">
+            <div className="max-w-6xl mx-auto space-y-4">
+              <div className="flex justify-center items-center gap-2">
+                <span className="text-2xl">💖</span>
+                <span className="text-xl font-cute font-bold text-[#FF69B4]">EvaHandcrafted</span>
+              </div>
+              <p className="text-sm text-neutral-400 max-w-md mx-auto">
+                Katalog resmi kerajinan tangan handmade premium. Semua produk merupakan dekorasi buatan tangan.
+              </p>
+              
+              {/* Media Sosial & Tautan Admin Sejajar */}
+              <div className="flex flex-col sm:flex-row items-center justify-between border-t border-pink-100 pt-6 mt-6 gap-4">
+                <p className="text-xs text-neutral-400">
+                  &copy; 2026 EvaHandcrafted. Design Website by Bismo Art .
+                </p>
+                
+                <div className="flex items-center gap-4">
+                  {/* Subtle Admin Access Toggle Link */}
+                  {!showAdminPanel && apiConnected && (
+                    <button 
+                      onClick={handleAdminToggleClick} 
+                      className="text-xs text-neutral-400 hover:text-[#FF69B4] hover:underline transition-colors focus:outline-none flex items-center gap-1 bg-neutral-50 hover:bg-pink-50 border border-neutral-200 hover:border-pink-200 py-1 px-3 rounded-full"
+                    >
+                      <i data-lucide="lock" className="w-3.5 h-3.5"></i>
+                      <span>Akses Admin</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </footer>
+
+          {/* MODAL PASSWORD ADMIN (POP-UP) */}
+          {showPasswordModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fadeIn">
+              <div className="clay-card bg-white max-w-sm w-full p-6 relative animate-scaleUp text-center">
+                
+                {/* Tombol Tutup */}
+                <button 
+                  onClick={() => { setShowPasswordModal(false); setLoginUser(''); setLoginPass(''); setLoginError(''); setShowPasswordText(false); }} 
+                  className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-neutral-100 text-neutral-400 hover:text-neutral-600 transition-colors"
+                >
+                  <i data-lucide="x" className="w-4 h-4"></i>
+                </button>
+
+                <div className="w-16 h-16 bg-pink-100 rounded-full flex items-center justify-center border-4 border-pink-200 mx-auto mb-4">
+                  <i data-lucide="lock" className="w-8 h-8 text-[#FF69B4]"></i>
+                </div>
+
+                <h3 className="text-xl font-bold font-cute text-[#FF69B4] mb-2">Akses Terkunci</h3>
+                <p className="text-xs text-neutral-400 mb-4">
+                  Silakan masukkan akun admin Anda untuk mengelola etalase EvaHandcrafted. <br/>
+                  {isDemoMode && <strong className="text-[#FF69B4]">Simulasi Login default: admin / eva123</strong>}
+                </p>
+
+                <form onSubmit={handleLoginSubmit} className="space-y-3 text-left">
+                  <div>
+                    <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wider mb-1 pl-1">Username</label>
+                    <input 
+                      type="text" 
+                      placeholder="Username Admin" 
+                      className="w-full p-2.5 clay-input text-sm font-semibold"
+                      value={loginUser}
+                      onChange={(e) => setLoginUser(e.target.value)}
+                      required
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wider mb-1 pl-1">Password</label>
+                    <div className="relative flex items-center">
+                      <input 
+                        type={showPasswordText ? "text" : "password"} 
+                        placeholder="Password Admin" 
+                        className="w-full p-2.5 pr-10 clay-input text-sm font-semibold tracking-wider"
+                        value={loginPass}
+                        onChange={(e) => setLoginPass(e.target.value)}
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPasswordText(!showPasswordText)}
+                        className="absolute right-3 text-neutral-400 hover:text-[#FF69B4] transition-colors focus:outline-none"
+                      >
+                        <i data-lucide={showPasswordText ? "eye-off" : "eye"} className="w-4 h-4"></i>
+                      </button>
+                    </div>
+                  </div>
+
+                  {loginError && (
+                    <p className="text-xs text-red-500 font-bold text-center mt-1">{loginError}</p>
+                  )}
+                  
+                  <div className="flex gap-2 pt-2">
+                    <button 
+                      type="button" 
+                      onClick={() => { setShowPasswordModal(false); setLoginUser(''); setLoginPass(''); setLoginError(''); setShowPasswordText(false); }}
+                      className="flex-1 py-2.5 font-bold text-xs clay-btn-secondary"
+                    >
+                      Batal
+                    </button>
+                    <button 
+                      type="submit" 
+                      className="flex-1 py-2.5 font-bold text-xs clay-btn"
+                    >
+                      Buka Akses 🔓
+                    </button>
+                  </div>
+                </form>
+
+              </div>
+            </div>
+          )}
+
+          {/* MODAL DETAIL PRODUK */}
+          {selectedProduct && (
+            <div 
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fadeIn"
+              onClick={() => setSelectedProduct(null)}
+            >
+              <div 
+                className="clay-card bg-white max-w-lg w-full overflow-hidden p-6 relative animate-scaleUp"
+                onClick={(e) => e.stopPropagation()}
+              >
+                
+                {/* Tombol Tutup Silang Atas */}
+                <button 
+                  onClick={() => setSelectedProduct(null)} 
+                  className="absolute top-4 right-4 p-2 rounded-full hover:bg-neutral-100 text-neutral-400 hover:text-neutral-600 transition-colors"
+                >
+                  <i data-lucide="x" className="w-5 h-5"></i>
+                </button>
+
+                {/* Konten Detail */}
+                <div className="space-y-4">
+                  
+                  {/* Foto Detail Interaktif Klik Untuk Zoom */}
+                  <div className="relative group aspect-video w-full overflow-hidden rounded-2xl border-4 border-pink-100 cursor-zoom-in" onClick={() => setZoomedImage(selectedProduct.image)}>
+                    <img 
+                      src={selectedProduct.image} 
+                      alt={selectedProduct.title} 
+                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
+                    />
+                    <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-bold gap-1.5">
+                      <i data-lucide="zoom-in" className="w-4 h-4"></i>
+                      Klik Gambar Untuk Memperbesar
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="bg-pink-100 text-[#FF69B4] text-xs font-bold px-2.5 py-1 rounded-full">
+                        {selectedProduct.category}
+                      </span>
+                    </div>
+
+                    <h3 className="text-xl font-bold text-neutral-800 leading-tight">
+                      {selectedProduct.title}
+                    </h3>
+
+                    {/* Harga & Views */}
+                    <div className="flex items-center justify-between py-2 border-y-2 border-pink-50">
+                      <div className="text-2xl font-bold text-[#FF69B4] font-cute">
+                        {formatRupiah(selectedProduct.price)}
+                      </div>
+                      <div className="flex items-center gap-1.5 text-sm font-semibold text-neutral-500">
+                        <i data-lucide="eye" className="w-4 h-4 text-[#FF69B4]"></i>
+                        <span>{selectedProduct.sold || 0}x dilihat</span>
+                      </div>
+                    </div>
+
+                    {/* Deskripsi */}
+                    <div className="space-y-1">
+                      <span className="text-xs font-bold text-neutral-400 uppercase tracking-wider">Deskripsi Produk:</span>
+                      <p className="text-sm text-neutral-600 leading-relaxed max-h-36 overflow-y-auto pr-1">
+                        {selectedProduct.description}
+                      </p>
+                    </div>
+
+                    {/* Hubungi Penjual - Dua Kontak Admin */}
+                    <div className="pt-4 space-y-3">
+                      <span className="text-xs font-bold text-neutral-400 uppercase tracking-wider block text-center">Hubungi Admin Untuk Pemesanan:</span>
+                      
+                      <div className="flex flex-col sm:flex-row gap-3">
+                        {/* Admin 1 */}
+                        <a 
+                          href={`https://wa.me/6281994347002?text=Halo%20EvaHandcrafted%20Admin%201%2C%20saya%20tertarik%20dengan%20produk%20"${encodeURIComponent(selectedProduct.title)}"%20seharga%20${formatRupiah(selectedProduct.price)}.%20Apakah%20stoknya%20ready%3F`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 py-3 font-bold clay-btn flex items-center justify-center gap-2 text-sm bg-[#FFB6C1] border-[#FF99AA]"
+                        >
+                          <i data-lucide="phone-call" className="w-5 h-5"></i> Admin 1 (Mbak Eva)
+                        </a>
+
+                        {/* Admin 2 */}
+                        <a 
+                          href={`https://wa.me/6282332648110?text=Halo%20EvaHandcrafted%20Admin%202%2C%20saya%20tertarik%20dengan%20produk%20"${encodeURIComponent(selectedProduct.title)}"%20seharga%20${formatRupiah(selectedProduct.price)}.%20Apakah%20stoknya%20ready%3F`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 py-3 font-bold clay-btn-secondary flex items-center justify-center gap-2 text-sm border-[#FFC0CB]"
+                        >
+                          <i data-lucide="phone-call" className="w-5 h-5"></i> Admin 2 (Mas Bismo)
+                        </a>
+                      </div>
+
+                      {/* Tombol Tutup Detail */}
+                      <button 
+                        onClick={() => setSelectedProduct(null)}
+                        className="w-full py-2.5 mt-2 font-bold text-xs text-neutral-400 hover:text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-xl transition-all flex items-center justify-center gap-1.5"
+                      >
+                        <i data-lucide="x" className="w-4 h-4"></i> Tutup Detail
+                      </button>
+                    </div>
+
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          )}
+
+          {/* MODAL ZOOM GAMBAR PRODUK (FULL-SCREEN LIGHTBOX) */}
+          {zoomedImage && (
+            <div 
+              className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn cursor-zoom-out"
+              onClick={() => setZoomedImage(null)}
+            >
+              <div className="relative max-w-4xl w-full max-h-[85vh] flex items-center justify-center animate-scaleUp" onClick={(e) => e.stopPropagation()}>
+                {/* Tombol Close */}
+                <button 
+                  onClick={() => setZoomedImage(null)}
+                  className="absolute -top-14 right-0 bg-white/10 hover:bg-white/20 p-2.5 rounded-full text-white transition-colors cursor-pointer"
+                >
+                  <i data-lucide="x" className="w-6 h-6"></i>
+                </button>
+                <img 
+                  src={zoomedImage} 
+                  alt="Zoom Gambar Produk" 
+                  className="max-w-full max-h-[80vh] object-contain rounded-2xl border-4 border-pink-100/30 shadow-2xl" 
+                />
+              </div>
+            </div>
+          )}
+
+          {/* MODAL DETEKSI ERROR CACHING GOOGLE APPS SCRIPT */}
+          {showGasVersionAlert && (
+            <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fadeIn">
+              <div className="clay-card bg-white max-w-lg w-full p-6 relative animate-scaleUp text-left space-y-4">
+                <div className="flex items-center gap-3 border-b-2 border-red-100 pb-3">
+                  <span className="text-3xl">⚠️</span>
+                  <div>
+                    <h3 className="text-lg font-bold font-cute text-red-500">Langkah Otorisasi Tertunda!</h3>
+                    <p className="text-xs text-neutral-400">Pembaruan produk atau Izin File Upload ditolak.</p>
+                  </div>
+                </div>
+                
+                <div className="text-xs text-neutral-600 space-y-3 leading-relaxed">
+                  <p>
+                    Hal ini terjadi karena Anda baru saja memperbarui Google Apps Script, tetapi <strong>belum memberikan izin akses penyimpanan ke Google Drive (`DriveApp`)</strong> dan tidak menyebarkan versi baru.
+                  </p>
+                  <div className="bg-red-50 p-3 rounded-xl border border-red-100 space-y-1.5 text-[11px] text-red-700">
+                    <p className="font-bold">📋 Cara Mengatasi (Hanya sekali):</p>
+                    <ol className="list-decimal list-inside space-y-1">
+                      <li>Buka halaman editor <strong>Google Apps Script</strong> Anda.</li>
+                      <li>Di bagian atas, di sebelah tombol <strong>Terapkan (Deploy)</strong>, ada menu dropdown untuk memilih fungsi. Pilih fungsi <code>initDatabase</code>.</li>
+                      <li>Klik tombol <strong>Jalankan (Run)</strong>. Ini akan memicu popup "Otorisasi Diperlukan".</li>
+                      <li>Pilih akun Google Anda > Klik "Lanjutan (Advanced)" > Klik "Lanjutkan ke Skrip...". Kemudian izinkan semuanya.</li>
+                      <li>Klik ikon <strong>Pensil (Edit)</strong> pada <strong>Kelola Penerapan (Manage deployments)</strong>. Ubah Version menjadi <strong>New version (Versi baru)</strong>, lalu Deploy.</li>
+                    </ol>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-2.5 pt-2">
+                  <button 
+                    onClick={() => {
+                      setIsDemoMode(true);
+                      setShowGasVersionAlert(false);
+                      showAdminToast("⭐ Mode simulasi diaktifkan sementara agar Anda dapat menguji uploader.");
+                    }}
+                    className="flex-1 py-2.5 text-xs font-bold clay-btn-secondary"
+                  >
+                    Gunakan Mode Simulasi Offline
+                  </button>
+                  <button 
+                    onClick={() => setShowGasVersionAlert(false)}
+                    className="flex-1 py-2.5 text-xs font-bold clay-btn"
+                  >
+                    Saya Paham, Tutup
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* CUSTOM CLAY CONFIRMATION MODAL */}
+          {confirmModal.show && (
+            <div className="fixed inset-0 z-55 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fadeIn">
+              <div className="clay-card bg-white max-w-sm w-full p-6 text-center animate-scaleUp">
+                <span className="text-4xl">⚠️</span>
+                <h3 className="text-lg font-bold font-cute text-[#FF69B4] mt-2 mb-1">{confirmModal.title}</h3>
+                <p className="text-sm text-neutral-500 mb-4">{confirmModal.message}</p>
+                
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => setConfirmModal({ ...confirmModal, show: false })}
+                    className="flex-1 py-2.5 font-bold text-xs clay-btn-secondary"
+                  >
+                    Batal
+                  </button>
+                  <button 
+                    onClick={() => {
+                      if (confirmModal.onConfirm) confirmModal.onConfirm();
+                      setConfirmModal({ ...confirmModal, show: false });
+                    }}
+                    className="flex-1 py-2.5 font-bold text-xs clay-btn-danger"
+                  >
+                    Ya, Hapus
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+        </div>
+      );
     }
 
-    if (action === "update_product") {
-      updateProduct(postData.product);
-      return handleResponse({ status: "success", message: "Produk berhasil diperbarui di Spreadsheet!" });
-    }
-    
-    if (action === "delete_product") {
-      deleteProduct(postData.productId);
-      return handleResponse({ status: "success", message: "Produk berhasil dihapus dari Spreadsheet!" });
-    }
-    
-    if (action === "add_category") {
-      addCategory(postData.categoryName);
-      return handleResponse({ status: "success", message: "Kategori berhasil ditambahkan!" });
-    }
-    
-    if (action === "delete_category") {
-      deleteCategory(postData.categoryName);
-      return handleResponse({ status: "success", message: "Kategori berhasil dihapus!" });
-    }
-    
-    return handleResponse({ status: "error", message: "Aksi tidak dikenali atau tidak valid!" });
-    
-  } catch (error) {
-    return handleResponse({ status: "error", message: "Terjadi kesalahan internal: " + error.toString() });
-  }
-}
-
-/**
- * FUNGSI HELPER PENANGANAN RESPONS (CORS SAFE)
- */
-function handleResponse(output) {
-  var JSONString = JSON.stringify(output);
-  return ContentService.createTextOutput(JSONString)
-    .setMimeType(ContentService.MimeType.JSON);
-}
-
-/**
- * FUNGSI INISIALISASI STRUKTUR DATABASE
- */
-function initDatabase() {
-  var ss = getSpreadsheet();
-  
-  var productsSheet = ss.getSheetByName("Products");
-  if (!productsSheet) {
-    productsSheet = ss.insertSheet("Products");
-    productsSheet.appendRow(["ID", "Title", "Price", "Category", "Image", "Rating", "Sold", "Description"]);
-    var defaultProducts = [
-      [1607604276001, "Gantungan Kunci Clay Awan Lucu", 25000, "Gantungan Kunci", "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=500&auto=format&fit=crop&q=60", 5.0, 0, "Gantungan kunci awan imut handmade yang dibuat dari air dry clay berkualitas tinggi."],
-      [1607604276002, "Piring Perhiasan Keramik Estetik Tulip", 48000, "Dekorasi Rumah", "https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&auto=format&fit=crop&q=60", 5.0, 0, "Piring kecil serbaguna untuk meletakkan cincin, kalung, atau anting dengan hiasan bunga tulip."],
-      [1607604276003, "Cincin Manik-Manik Colorful Clay Daisy", 12000, "Aksesoris", "https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=500&auto=format&fit=crop&q=60", 5.0, 0, "Cincin manik-manik elastis dengan hiasan bunga daisy clay di tengahnya."],
-      [1607604276004, "Cermin Meja Hias Bingkai Foam Clay", 75000, "Dekorasi Rumah", "https://images.unsplash.com/photo-1618220179428-22790b461013?w=500&auto=format&fit=crop&q=60", 5.0, 0, "Cermin estetik dengan bingkai bertekstur empuk mirip awan berbahan clay busa."]
-    ];
-    for (var i = 0; i < defaultProducts.length; i++) {
-      productsSheet.appendRow(defaultProducts[i]);
-    }
-  }
-  
-  var categoriesSheet = ss.getSheetByName("Categories");
-  if (!categoriesSheet) {
-    categoriesSheet = ss.insertSheet("Categories");
-    categoriesSheet.appendRow(["CategoryName"]);
-    var defaultCats = [["Gantungan Kunci"], ["Dekorasi Rumah"], ["Aksesoris"]];
-    for (var j = 0; j < defaultCats.length; j++) {
-      categoriesSheet.appendRow(defaultCats[j]);
-    }
-  }
-  
-  var configSheet = ss.getSheetByName("AdminConfig");
-  if (!configSheet) {
-    configSheet = ss.insertSheet("AdminConfig");
-    configSheet.appendRow(["Key", "Value"]);
-    configSheet.appendRow(["username", "admin"]);
-    configSheet.appendRow(["password", "eva123"]); 
-  }
-  
-  var defaultSheet = ss.getSheetByName("Sheet1");
-  if (defaultSheet && ss.getSheets().length > 1) {
-    ss.deleteSheet(defaultSheet);
-  }
-}
-
-/**
- * FUNGSI OPERASI READ DATABASE
- */
-function getAllData() {
-  var ss = getSpreadsheet();
-  var productsSheet = ss.getSheetByName("Products");
-  var productRows = productsSheet.getDataRange().getValues();
-  var products = [];
-  for (var i = 1; i < productRows.length; i++) {
-    products.push({
-      id: Number(productRows[i][0]),
-      title: String(productRows[i][1]),
-      price: Number(productRows[i][2]),
-      category: String(productRows[i][3]),
-      image: String(productRows[i][4]),
-      rating: Number(productRows[i][5]),
-      sold: Number(productRows[i][6]),
-      description: String(productRows[i][7])
-    });
-  }
-  
-  var categoriesSheet = ss.getSheetByName("Categories");
-  var categoryRows = categoriesSheet.getDataRange().getValues();
-  var categories = [];
-  for (var j = 1; j < categoryRows.length; j++) {
-    categories.push(String(categoryRows[j][0]));
-  }
-  
-  return { products: products, categories: categories };
-}
-
-function getAdminCredentials() {
-  var ss = getSpreadsheet();
-  var configSheet = ss.getSheetByName("AdminConfig");
-  var rows = configSheet.getDataRange().getValues();
-  var credentials = { username: "", password: "" };
-  for (var i = 1; i < rows.length; i++) {
-    if (rows[i][0] === "username") credentials.username = String(rows[i][1]);
-    if (rows[i][0] === "password") credentials.password = String(rows[i][1]);
-  }
-  return credentials;
-}
-
-/**
- * FUNGSI OPERASI WRITE, UPDATE & DELETE DATABASE
- */
-function updateAdminCredentials(newUsername, newPassword) {
-  var ss = getSpreadsheet();
-  var configSheet = ss.getSheetByName("AdminConfig");
-  var rows = configSheet.getDataRange().getValues();
-  for (var i = 1; i < rows.length; i++) {
-    if (rows[i][0] === "username") configSheet.getRange(i + 1, 2).setValue(newUsername);
-    if (rows[i][0] === "password") configSheet.getRange(i + 1, 2).setValue(newPassword);
-  }
-}
-
-function addProduct(p) {
-  if (!p) return;
-  var ss = getSpreadsheet();
-  var productsSheet = ss.getSheetByName("Products");
-  productsSheet.appendRow([
-    p.id, p.title, p.price, p.category, p.image, p.rating || 5.0, p.sold || 0, p.description
-  ]);
-}
-
-function updateProduct(p) {
-  if (!p) return;
-  var ss = getSpreadsheet();
-  var productsSheet = ss.getSheetByName("Products");
-  var rows = productsSheet.getDataRange().getValues();
-  for (var i = 1; i < rows.length; i++) {
-    if (Number(rows[i][0]) === Number(p.id)) {
-      productsSheet.getRange(i + 1, 2).setValue(p.title);
-      productsSheet.getRange(i + 1, 3).setValue(p.price);
-      productsSheet.getRange(i + 1, 4).setValue(p.category);
-      productsSheet.getRange(i + 1, 5).setValue(p.image);
-      productsSheet.getRange(i + 1, 6).setValue(p.rating || 5.0);
-      productsSheet.getRange(i + 1, 7).setValue(p.sold || 0);
-      productsSheet.getRange(i + 1, 8).setValue(p.description);
-      break;
-    }
-  }
-}
-
-function deleteProduct(productId) {
-  var ss = getSpreadsheet();
-  var productsSheet = ss.getSheetByName("Products");
-  var rows = productsSheet.getDataRange().getValues();
-  for (var i = 1; i < rows.length; i++) {
-    if (Number(rows[i][0]) === Number(productId)) {
-      productsSheet.deleteRow(i + 1);
-      break;
-    }
-  }
-}
-
-function addCategory(catName) {
-  var ss = getSpreadsheet();
-  var categoriesSheet = ss.getSheetByName("Categories");
-  categoriesSheet.appendRow([catName]);
-}
-
-function deleteCategory(catName) {
-  var ss = getSpreadsheet();
-  var categoriesSheet = ss.getSheetByName("Categories");
-  var rows = categoriesSheet.getDataRange().getValues();
-  for (var i = 1; i < rows.length; i++) {
-    if (String(rows[i][0]) === String(catName)) {
-      categoriesSheet.deleteRow(i + 1);
-      break;
-    }
-  }
-}
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
