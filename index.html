@@ -4,14 +4,29 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>EvaHandcrafted - Katalog Handcraft Imut</title>
+  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts for Cute Rounded Look -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300..700&family=Quicksand:wght=500;700&display=swap" rel="stylesheet">
+  <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- React & Babel -->
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- SOLUSI UTAMA BABEL: Memaksa Babel Standalone menggunakan Runtime Klasik secara konsisten -->
+  <script>
+    if (typeof Babel !== 'undefined') {
+      Babel.registerPreset("react-classic", {
+        presets: [
+          [Babel.availablePresets["react"], { runtime: "classic" }]
+        ]
+      });
+    }
+  </script>
 
   <style>
     body {
@@ -148,9 +163,11 @@
 
   <div id="root"></div>
 
-  <script type="text/babel">
+  <!-- Menggunakan preset kustom 'react-classic' untuk menghilangkan konflik kompilasi JSX Babel -->
+  <script type="text/babel" data-presets="env,react-classic">
     const { useState, useEffect, useRef, useMemo } = React;
 
+    // Komponen Ikon Lucide terisolasi untuk mencegah error reconciler 'removeChild'
     const LucideIcon = ({ name, className }) => {
       const iconRef = useRef(null);
 
@@ -164,19 +181,25 @@
       return <span ref={iconRef} style={{ display: 'contents' }}></span>;
     };
 
-    // SOLUSI UTAMA: Fungsi converter cerdas dan pengompres ukuran aset gambar berbasis Google CDN.
-    // Menjamin gambar tetap muncul walau di spreadsheet tersimpan link format lama/rusak.
+    // Fungsi konverter cerdas dan pengompres ukuran aset gambar berbasis Google CDN.
+    // Memaksa resolusi ideal agar loading halaman web super cepat & bebas hambatan cookie.
     const getOptimizedImgUrl = (url, size = 500) => {
       if (!url || url.trim() === "") return "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=500";
-      if (url.startsWith("data:image")) return url; // Untuk preview local base64
+      if (url.startsWith("data:image")) return url; 
       
-      // Ekstrak ID File Google Drive dari segala macam variasi format link (uc, file/d, open, id=)
-      const regExp = /id=([^&]+)|file\/d\/([^/]+)/;
-      const match = url.match(regExp);
+      const cleanUrl = url.trim();
+
+      // Deteksi jika pengguna hanya memasukkan direct ID Drive
+      if (/^[a-zA-Z0-9_-]{25,45}$/.test(cleanUrl)) {
+        return `https://drive.google.com/thumbnail?id=${cleanUrl}&sz=w${size}`;
+      }
+
+      // Ekstrak ID File Google Drive dari tautan URL
+      const regExp = /id=([^&]+)|file\/d\/([^/&#]+)|usercontent\.com\/d\/([^/&#]+)/;
+      const match = cleanUrl.match(regExp);
       
       if (match) {
-        const id = match[1] || match[2];
-        // Menggunakan endpoint Thumbnail resmi Google dengan parameter size (sz) agar loading super ringan
+        const id = match[1] || match[2] || match[3];
         return `https://drive.google.com/thumbnail?id=${id}&sz=w${size}`;
       }
       return url;
@@ -214,7 +237,10 @@
       });
     };
 
-    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxMFktq5BVKbsXoQUzeD-3FkaphgnhYMQoFO1HpjcAEfUyJGYQ_qw6V__uaBS4B7hDaRg/exec"; 
+    // =========================================================================
+    // TEMPEL URL WEB APP GOOGLE APPS SCRIPT ANDA DI SINI
+    // =========================================================================
+    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwq5WKeDQwjAgan8oGKJk46RKiIvJXBkQ2DV8jPQlB0dg5QGdYEQKpeSrw5fPm7D2HtXw/exec"; 
 
     function App() {
       const [products, setProducts] = useState([]);
@@ -233,6 +259,7 @@
       const [editingProductId, setEditingProductId] = useState(null);
       const [editingProductViews, setEditingProductViews] = useState(0);
       const [selectedImageFile, setSelectedImageFile] = useState(null); 
+      const [isUploadingImage, setIsUploadingImage] = useState(false); 
       
       const [showAdminPanel, setShowAdminPanel] = useState(false);
       const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
@@ -265,7 +292,7 @@
         onConfirm: null
       });
 
-      // Optimasi Performa Pencarian dengan useMemo agar render aplikasi tidak berat
+      // Optimasi Performa Pencarian dengan useMemo
       const sortedProducts = useMemo(() => {
         const filtered = products.filter(product => {
           const matchesSearch = product.title.toLowerCase().includes(searchTerm.toLowerCase());
@@ -484,6 +511,7 @@
         }
 
         setIsLoading(true);
+        setIsUploadingImage(true);
 
         let imageDetails = null;
         if (selectedImageFile) {
@@ -513,6 +541,7 @@
 
           const result = await sendPostRequest(payload);
           setIsLoading(false);
+          setIsUploadingImage(false);
           
           if (result && result.status === "error") {
             showAdminToast(`❌ Gagal memperbarui: ${result.message}`);
@@ -546,6 +575,7 @@
 
           const result = await sendPostRequest(payload);
           setIsLoading(false);
+          setIsUploadingImage(false);
 
           if (result && result.status === "error") {
             showAdminToast(`❌ Gagal menyimpan: ${result.message}`);
@@ -591,6 +621,7 @@
         setNewImage('');
         setSelectedImageFile(null);
         setNewDesc('');
+        setIsUploadingImage(false);
         
         const fileInput = document.getElementById('imageUploader');
         if (fileInput) fileInput.value = "";
@@ -933,12 +964,18 @@
                             <button 
                               type="submit" 
                               className="w-full py-3 font-bold clay-btn disabled:opacity-50 flex items-center justify-center gap-2"
-                              disabled={categories.length === 0}
+                              disabled={categories.length === 0 || isUploadingImage}
                             >
-                              {isEditing ? "Simpan Perubahan 💾" : "Upload & Simpan Produk ✨"}
+                              {isUploadingImage ? (
+                                <><LucideIcon name="loader-2" className="w-4 h-4 animate-spin" /> Mengunggah & Menyimpan...</>
+                              ) : isEditing ? (
+                                "Simpan Perubahan 💾"
+                              ) : (
+                                "Upload & Simpan Produk ✨"
+                              )}
                             </button>
                             
-                            {isEditing && (
+                            {isEditing && !isUploadingImage && (
                               <button 
                                 type="button"
                                 onClick={handleCancelEdit}
@@ -1218,7 +1255,6 @@
                         className="clay-card flex flex-col justify-between overflow-hidden cursor-pointer bg-white"
                         onClick={() => handleOpenProductDetail(product)}
                       >
-                        {/* Dioptimalkan menggunakan ukuran w505 agar memuat cepat di grid halaman depan */}
                         <div className="aspect-square w-full overflow-hidden relative bg-[#FFF0F5]">
                           <img 
                             src={getOptimizedImgUrl(product.image, 505)} 
@@ -1284,7 +1320,6 @@
             </main>
           )}
 
-          {/* FOOTER */}
           <footer className="bg-white border-t-4 border-[#FFD1DC] mt-8 py-8 px-4 text-center">
             <div className="max-w-6xl mx-auto space-y-4">
               <div className="flex justify-center items-center gap-2">
@@ -1297,7 +1332,7 @@
               
               <div className="flex flex-col sm:flex-row items-center justify-between border-t border-pink-100 pt-6 mt-6 gap-4">
                 <p className="text-xs text-neutral-400">
-                  © 2026 EvaHandcrafted. Design Website by Bismo Art .
+                  &copy; 2026 EvaHandcrafted. Design Website by Bismo Art .
                 </p>
                 
                 <div className="flex items-center gap-4">
@@ -1315,7 +1350,6 @@
             </div>
           </footer>
 
-          {/* MODAL PASSWORD ADMIN */}
           {showPasswordModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fadeIn">
               <div className="clay-card bg-white max-w-sm w-full p-6 relative animate-scaleUp text-center">
@@ -1395,7 +1429,6 @@
             </div>
           )}
 
-          {/* MODAL DETAIL PRODUK */}
           {selectedProduct && (
             <div 
               className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fadeIn"
@@ -1414,12 +1447,12 @@
                 </button>
 
                 <div className="space-y-4">
-                  {/* Dioptimalkan menggunakan ukuran w1000 untuk tampilan detail agar tetap tajam namun kompresi berjalan */}
+                  
                   <div className="relative group aspect-video w-full overflow-hidden rounded-2xl border-4 border-pink-100 cursor-zoom-in" onClick={() => setZoomedImage(getOptimizedImgUrl(selectedProduct.image, 1000))}>
                     <img 
                       src={getOptimizedImgUrl(selectedProduct.image, 800)} 
                       alt={selectedProduct.title} 
-                      className="w-full h-full object-cover" 
+                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
                     />
                     <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-bold gap-1.5">
                       <LucideIcon name="zoom-in" className="w-4 h-4" />
